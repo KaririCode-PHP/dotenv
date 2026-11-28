@@ -2,7 +2,75 @@
 
 All notable changes to `kariricode/dotenv`. Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions follow [Semantic Versioning](https://semver.org/).
 
-## [4.5.0] — 2026-09-29
+## [4.5.0] — 2026-11-28
+
+The first 4.x release on Packagist, which until now carried 1.x and 2.0.0:
+the 4.x line was developed outside this repository and replaces 2.0.0 here.
+It was prepared in two passes — the review of 2026-09-29, whose lists start
+at "Security" below, and the conformance pass of 2026-11-28 to KaririCode
+Specification V4.3.3, summarised first. Coming from 2.0.0, read both.
+
+### Spec V4.3.3 conformance (2026-11-28)
+
+**Breaking**
+
+- Every exception carries an `EnvCode` from block 2700–2799, prefix `ENV`;
+  messages start with `[ENV_<code>]`, quote paths and names, and never
+  contain values, keys or payloads (ADR-010).
+- `DotenvException` is the marker interface every exception implements,
+  with `$errorCode`; `catch (DotenvException $e)` works as before, but code
+  that extended the abstract class must implement the interface. Each
+  concrete exception extends one kariricode/exception family base:
+  Validation (`ParseException`, `ConversionException`,
+  `ValidationException`), NotFound (`FileNotFoundException`),
+  Configuration (`ConfigurationException`) and Runtime
+  (`ImmutableException`, `EncryptionException`, `CacheException`).
+- A key of the wrong size is `ConfigurationException::invalidEncryptionKey()`
+  or `invalidPrivateKey()` (ENV_2724, ENV_2725), no longer an
+  `EncryptionException`.
+- `ValidationException::batchErrors()` joins its messages on one line;
+  `errors()` still lists them one by one.
+- The CLI prints exceptions with their code: `✗ [ENV_2752] Decryption
+  failed — wrong key or corrupted payload.`
+- Requires `kariricode/contract` ^2.11 and `kariricode/exception` ^2.0.2
+  (ADR-001 amended); `composer.lock` is committed; the tools left
+  `require-dev`; `extra.kariricode` declares ARFA 1.3, ASVS 5.0 level 2,
+  Spec 4.3.3 and the error-code range.
+
+**Added**
+
+- `Integration\DotenvEnvironmentResolver` implements kariricode/contract's
+  `Environment\EnvironmentResolver` over a loaded instance (ADR-011).
+- `Exception\EnvCode`; `tests/Conformance` with the ARFA 1.3 and Spec
+  checks and the registry check; `SECURITY.md`; `CONTRIBUTING.md`;
+  `docs/quality/QD-V433-COMPLIANCE.md`; ADR-009 to ADR-011.
+
+**Changed**
+
+- The quality gates run through KaririCode Devkit with the root configs:
+  `composer check` (PER-CS 3.0, PHPStan max with the strict, PHPUnit and
+  cognitive rules on `src`, the CLI and `tests`, Psalm level 1, the
+  complexity budgets of §13, the three suites, mutation testing with
+  MSI ≥ 80), `composer security` and `composer sbom`; CI runs them on
+  PHP 8.4 and the suites on PHP 8.5 with the lowest dependencies, with
+  actions pinned by commit SHA (ADR-009). The release workflow is gone.
+- Every class has a docblock with the comment criteria of §17, every call
+  with three or more arguments names them (§30), and ADR-001 to ADR-008
+  follow the canonical layout.
+- `env()` builds a `TypeSystem` per call instead of keeping one in a
+  function-level static.
+- `DotenvParser`, `EnvFileScanner`, `SchemaParser`, `PhpFileCache` and
+  `Dotenv` split their longest methods to meet §13, without changing
+  behaviour.
+
+**Fixed**
+
+- Patterns anchor their end with `\z` instead of `$`.
+- `MatchesRegexRule` rejects an empty pattern before compiling it.
+- A cache that cannot be written raises `CacheException` without a PHP
+  warning first.
+
+### Review of 2026-09-29
 
 First release verified by executing the toolchain (PHPUnit, PHPStan level 9, PHP-CS-Fixer) on PHP 8.4. Earlier 4.x notes relied on reading the code only; see `docs/CODE-REVIEW.md`.
 

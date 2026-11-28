@@ -1,12 +1,12 @@
 # ADR-004: AES-256-GCM Encryption Format
 
-| Field | Value |
-|---|---|
-| **Status** | Accepted |
-| **Introduced** | 4.3.0 |
-| **ARFA 1.3** | P1 (Immutable State) |
-| **Errata** | E-011 |
-| **Date** | 2026-02-28 · revised 2026-09-29 (4.5.0) |
+## Status
+
+Accepted — introduced in 4.3.0.
+
+## Date
+
+2026-02-28 · revised 2026-09-29 (4.5.0)
 
 ## Context
 
@@ -76,18 +76,31 @@ Non-encrypted values (`Encryptor::isEncrypted() === false`) pass through unchang
 
 ## Consequences
 
-**Positive:**
+### Positive
+
 - Secrets can be safely committed to VCS — only the private key must be protected.
 - No runtime dependency on external services — decryption is local and instant.
 - Self-describing format — `encrypted:` prefix enables transparent decryption in the load pipeline.
 - Each encryption produces unique ciphertext — safe for audit logs and diff tools.
 
-**Negative:**
+### Negative
+
 - Key rotation requires re-encrypting all values. The CLI `encrypt` command handles this.
 - ext-openssl must be present. It is bundled in all standard PHP distributions but may be absent in Alpine-based minimal images.
 - No key derivation function (KDF) — the key must be high-entropy (random bytes), not a password.
 
-**Rejected alternatives:**
-- **libsodium (XChaCha20-Poly1305):** Stronger nonce safety (192-bit nonce) but ext-sodium is not bundled in all distributions. AES-256-GCM with random 96-bit nonces is safe for the expected volume (< 2³² encryptions per key).
-- **Whole-file encryption:** Would prevent `git diff` on plaintext values and require decrypting everything to read a single variable.
-- **Envelope encryption (AWS KMS pattern):** Adds network dependency and complexity disproportionate to the use case.
+## Alternatives Considered
+
+| Alternative | Why not |
+|---|---|
+| libsodium (XChaCha20-Poly1305) | Stronger nonce safety (192-bit nonce) but ext-sodium is not bundled in all distributions. AES-256-GCM with random 96-bit nonces is safe for the expected volume (< 2³² encryptions per key). |
+| Whole-file encryption | Would prevent `git diff` on plaintext values and require decrypting everything to read a single variable. |
+| Envelope encryption (AWS KMS pattern) | Adds network dependency and complexity disproportionate to the use case. |
+
+## References
+
+- ARFA 1.3 P1 (Immutable State).
+- SPEC-004; NIST SP 800-38D (GCM).
+- OWASP ASVS 5.0 V11 (cryptography).
+- ADR-010 (key errors are configuration errors).
+- Errata applied by the 4.5.0 review (CODE-REVIEW.md): E-011.

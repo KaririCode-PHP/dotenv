@@ -190,17 +190,17 @@ If no encryption key is available, encrypted values remain as-is (the literal `e
 
 ## 10. Error Conditions
 
-All errors are `KaririCode\Dotenv\Exception\EncryptionException` (extends `DotenvException`) created by named factories (E-011). Messages never contain key material or plaintext.
+A key of the wrong size is a `ConfigurationException` (Configuration family); a failed operation is an `EncryptionException` (Runtime family). Both implement `DotenvException`, are created by named factories and carry an `EnvCode` (ADR-010); messages start with `[ENV_<code>]` and never contain key material, payloads or plaintext.
 
-| Condition | Factory | Message |
-|---|---|---|
-| Key is not 32 raw bytes or 64 hex chars | `invalidKey()` | "Encryption key must be 32 raw bytes or a 64-character hex string (256-bit)." |
-| `KeyPair::fromPrivateKey()` input is not 64 hex chars | `invalidPrivateKey()` | "Private key must be a 64-character hex string (256-bit)." |
-| `openssl_encrypt()` fails | `encryptionFailed($reason)` | "Encryption failed: {openssl_error_string}" |
-| Payload is not base64 or shorter than 28 bytes | `malformedPayload()` | "Invalid encrypted payload: malformed base64 or too short." |
-| Wrong key, tampering or corruption (tag mismatch) | `decryptionFailed()` | "Decryption failed — wrong key or corrupted payload." |
+| Condition | Factory | Code | Message |
+|---|---|---|---|
+| Key is not 32 raw bytes or 64 hex chars | `ConfigurationException::invalidEncryptionKey()` | ENV_2724 | "Encryption key must be 32 raw bytes or a 64-character hex string (256-bit)." |
+| `KeyPair::fromPrivateKey()` input is not 64 hex chars | `ConfigurationException::invalidPrivateKey()` | ENV_2725 | "Private key must be a 64-character hex string (256-bit)." |
+| `openssl_encrypt()` fails | `EncryptionException::encryptionFailed($reason)` | ENV_2750 | "Encryption failed: {openssl_error_string}" |
+| Payload is not base64 or shorter than 28 bytes | `EncryptionException::malformedPayload()` | ENV_2751 | "Invalid encrypted payload: malformed base64 or too short." |
+| Wrong key, tampering or corruption (tag mismatch) | `EncryptionException::decryptionFailed()` | ENV_2752 | "Decryption failed — wrong key or corrupted payload." |
 
-**Change in 4.5.0:** 4.4 threw `\InvalidArgumentException` / `\RuntimeException`. Code catching those must catch `EncryptionException` (or `DotenvException`) instead.
+**Changes in 4.5.0:** 4.4 threw `\InvalidArgumentException` / `\RuntimeException`; the review of 2026-09-29 moved all five failures to `EncryptionException`, and the conformance pass of 2026-11-28 moved the two key errors to `ConfigurationException` and gave every failure its code. Code that catches `DotenvException` covers all of them.
 
 ## 11. CLI Commands
 

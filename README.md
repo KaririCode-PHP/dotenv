@@ -12,14 +12,14 @@
 
 <p align="center">
   <a href="https://packagist.org/packages/kariricode/dotenv"><img src="https://img.shields.io/packagist/v/kariricode/dotenv.svg" alt="Latest Version"></a>
-  <a href="https://github.com/KaririCode-Framework/kariricode-dotenv/actions"><img src="https://img.shields.io/github/actions/workflow/status/KaririCode-Framework/kariricode-dotenv/ci.yml" alt="CI Status"></a>
+  <a href="https://github.com/KaririCode-PHP/dotenv/actions"><img src="https://img.shields.io/github/actions/workflow/status/KaririCode-PHP/dotenv/ci.yml?branch=main" alt="CI Status"></a>
   <a href="https://php.net"><img src="https://img.shields.io/badge/php-%3E%3D8.4-8892BF.svg" alt="PHP Version"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-green.svg" alt="MIT License"></a>
 </p>
 
-Zero-dependency `.env` loader with automatic type casting, per-value AES-256-GCM encryption, a validated OPcache-friendly cache, batch validation (fluent DSL and schema files), environment-aware cascade loading, variable processors, allow/deny filtering, introspection and a CLI.
+`.env` loader with automatic type casting, per-value AES-256-GCM encryption, a validated OPcache-friendly cache, batch validation (fluent DSL and schema files), environment-aware cascade loading, variable processors, allow/deny filtering, introspection and a CLI.
 
-**Version:** 4.5.0 · **PHP:** ≥ 8.4 · **Dependencies:** 0 · **ARFA 1.3:** Level 1 (P1, P4, P5) · **Spec:** V4.0 · **License:** MIT
+**Version:** 4.5.0 · **PHP:** ≥ 8.4 · **Dependencies:** kariricode/contract, kariricode/exception · **ARFA 1.3:** Level 1 (P1, P4, P5) · **Spec:** V4.3.3 · **License:** MIT
 
 ## 1. Features
 
@@ -47,7 +47,16 @@ env('DB_PORT');     // int(5432)    from DB_PORT=5432
 env('CACHE_TTL');   // null         from CACHE_TTL=null
 ```
 
-Every library error extends `KaririCode\Dotenv\Exception\DotenvException`, so one `catch` covers them all.
+Every library error implements `KaririCode\Dotenv\Exception\DotenvException`, so one `catch` covers them all. Each also belongs to one kariricode/contract exception family (Validation, NotFound, Configuration or Runtime) and carries a code from block 2700–2799 in `$errorCode`; its message starts with `[ENV_<code>]` and never contains a value, a key or a payload (ADR-010).
+
+Components that read the environment through kariricode/contract can take the loaded values from `Integration\DotenvEnvironmentResolver`:
+
+```php
+use KaririCode\Dotenv\Integration\DotenvEnvironmentResolver;
+
+$environment = new DotenvEnvironmentResolver($dotenv); // Environment\EnvironmentResolver
+$dsn = $environment->get('DATABASE_URL') ?? 'sqlite::memory:';
+```
 
 ## 4. Type Casting
 
@@ -153,12 +162,14 @@ vendor/bin/kariricode-dotenv debug | validate | encrypt | decrypt | cache:dump |
 
 ## 12. Architecture and Quality
 
-Component specification (conformance, type taxonomy, exception model, file inventory, measured quality gates): [SPEC-001](docs/spec/SPEC-001-dotenv-component.md). Decisions: [docs/adr/](docs/adr/). Changes: [CHANGELOG.md](CHANGELOG.md). Review record: [docs/CODE-REVIEW.md](docs/CODE-REVIEW.md).
+Component specification (conformance, type taxonomy, exception model, file inventory): [SPEC-001](docs/spec/SPEC-001-dotenv-component.md). Decisions: [docs/adr/](docs/adr/). Quality record: [QD-V433](docs/quality/QD-V433-COMPLIANCE.md). Security: [SECURITY.md](SECURITY.md). Changes: [CHANGELOG.md](CHANGELOG.md). Review of 2026-09-29: [docs/CODE-REVIEW.md](docs/CODE-REVIEW.md).
+
+The quality gates of KaririCode Specification V4.3.3 run through [KaririCode Devkit](https://github.com/KaririCode-PHP/devkit) (`kcode`), which installs the toolchain pinned in `devkit.php` into `.kcode/` (ADR-009); [CONTRIBUTING.md](CONTRIBUTING.md) has the setup.
 
 ```bash
-composer test       # PHPUnit
-composer analyse    # PHPStan level 9 (src + bin)
-composer cs-fix     # PHP-CS-Fixer (PSR-12 + PHP 8.4 migration)
+kcode init           # the toolchain pinned in devkit.php, into .kcode/
+composer check       # cs-check, phpstan, psalm, complexity, the three suites, mutation
+composer security    # validate, audit of both locks, secret scan
 ```
 
 ## 13. License

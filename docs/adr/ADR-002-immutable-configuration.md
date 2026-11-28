@@ -1,12 +1,12 @@
 # ADR-002: Immutable Configuration and Value Objects
 
-| Field | Value |
-|---|---|
-| **Status** | Accepted |
-| **Introduced** | 4.0.0 |
-| **ARFA 1.3** | P1 (Immutable State) |
-| **Errata** | E-001, E-002, E-004, E-006 |
-| **Date** | 2026-02-28 · revised 2026-09-29 (4.5.0) |
+## Status
+
+Accepted — introduced in 4.0.0.
+
+## Date
+
+2026-02-28 · revised 2026-09-29 (4.5.0)
 
 ## Context
 
@@ -75,14 +75,31 @@ enum ValueType { case String; case Integer; case Float; case Boolean; case Null;
 
 ## Consequences
 
-**Positive:**
+### Positive
+
 - Thread-safe by construction — no locks needed in async runtimes.
 - Predictable behavior — configuration observed at time T₁ is identical at T₂.
 - IDE support — readonly properties enable aggressive static analysis (PHPStan level 9).
 - Defensive copying is unnecessary — readonly eliminates accidental mutation.
 
-**Negative:**
+### Negative
+
 - Configuration changes require instantiating new `DotenvConfiguration` objects via `with*()` methods.
 - Cannot use property hooks (PHP 8.4) on readonly promoted properties — a language-level constraint.
 
 **Trade-off accepted:** The cost of object allocation for `with*()` calls is negligible at bootstrap time (once per application lifecycle), making immutability effectively free.
+
+## Alternatives Considered
+
+| Alternative | Why not |
+|---|---|
+| Setters on `DotenvConfiguration` | a configuration changed after the loader read it would make two parts of the application see different settings |
+| A builder object | one more type for eleven named, defaulted constructor parameters; `with*()` covers the rare change after construction |
+| Property hooks for validation | PHP 8.4 forbids hooks on readonly properties (E-040), and validation belongs where the value is used |
+
+## References
+
+- ARFA 1.3 P1 (Immutable State).
+- KaririCode Specification V4.3.3 §5 (immutability), errata E-040.
+- SPEC-001.
+- Errata applied by the 4.5.0 review (CODE-REVIEW.md): E-001, E-002, E-004, E-006.

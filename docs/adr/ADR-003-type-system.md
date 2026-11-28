@@ -1,12 +1,12 @@
 # ADR-003: Pluggable Type System with Priority-Based Detection
 
-| Field | Value |
-|---|---|
-| **Status** | Accepted |
-| **Introduced** | 4.0.0 |
-| **ARFA 1.3** | P1 (Immutable State) |
-| **Errata** | E-003 |
-| **Date** | 2026-02-28 · revised 2026-09-29 (4.5.0) |
+## Status
+
+Accepted — introduced in 4.0.0.
+
+## Date
+
+2026-02-28 · revised 2026-09-29 (4.5.0)
 
 ## Context
 
@@ -73,16 +73,34 @@ Adding a detector invalidates the sort. Adding a caster replaces the existing on
 
 ## Consequences
 
-**Positive:**
+### Positive
+
 - Open/Closed Principle — new types require no modification to `TypeSystem`.
 - Deterministic — priority ordering eliminates ambiguity (`"true"` is always boolean, never string).
 - Testable — each detector/caster is a pure function, testable in isolation.
 - Zero overhead for strings — fallback path invokes no caster.
 
-**Negative:**
+### Negative
+
 - Priority collisions: two detectors at the same priority have undefined ordering (stable sort, but insertion-order dependent).
 - No composite types: a value cannot be detected as multiple types simultaneously.
 
-**Mitigations:**
+### Mitigations
+
 - Document that custom detectors should use priorities not in the default range (100–200).
 - The `resolve()` convenience method chains detect + cast for the common case.
+
+## Alternatives Considered
+
+| Alternative | Why not |
+|---|---|
+| A fixed `match` on the string | no extension point: a custom type would need a change to the package |
+| Casting in the detectors | detection and conversion would no longer be testable or replaceable apart |
+| No automatic casting (strings only) | every caller would repeat the same conversions; `typeCasting: false` keeps that behaviour for those who want it |
+
+## References
+
+- ARFA 1.3 P1 (Immutable State).
+- SPEC-003.
+- ADR-009 (`env()` without a static `TypeSystem`).
+- Errata applied by the 4.5.0 review (CODE-REVIEW.md): E-003.

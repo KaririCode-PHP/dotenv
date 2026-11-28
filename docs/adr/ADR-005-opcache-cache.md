@@ -1,12 +1,12 @@
 # ADR-005: OPcache-Friendly PHP Array Cache
 
-| Field | Value |
-|---|---|
-| **Status** | Accepted |
-| **Introduced** | 4.2.0 |
-| **ARFA 1.3** | P5 (Observability) |
-| **Errata** | E-001, E-004, E-011 |
-| **Date** | 2026-02-28 · revised 2026-09-29 (4.5.0) |
+## Status
+
+Accepted — introduced in 4.2.0.
+
+## Date
+
+2026-02-28 · revised 2026-09-29 (4.5.0)
 
 ## Context
 
@@ -103,22 +103,34 @@ load() / bootEnv()
 
 ## Consequences
 
-**Positive:**
+### Positive
+
 - No parsing when the cache matches; OPcache serves the array from shared memory.
 - Editing, adding or removing any cascade file invalidates the cache automatically.
 - The cache never holds plaintext when a key is configured.
 - Every mismatch falls back to parsing — the cache can make loading faster, never different.
 
-**Negative:**
+### Negative
+
 - An encrypted cache costs one AES-GCM decryption per variable per load (microseconds each).
 - Detection uses metadata: an in-place edit that keeps the same size within the same second and the same inode is not noticed. Deploy tools that replace files change the inode.
 - Paths are absolute, so dump the cache on the target host, in the deploy step.
 - With `opcache.validate_timestamps=0`, running `cache:dump` from the CLI does not reach PHP-FPM's shared memory: reload PHP-FPM (or reset its OPcache) after dumping.
 - Caches written by 4.4 are ignored after upgrading until they are dumped again.
 
-**Rejected alternatives:**
-- **APCu:** requires ext-apcu and is per-SAPI.
-- **JSON file:** `json_decode()` on every request is slower than an OPcache-backed `include`.
-- **`serialize()`:** slower than `include` for arrays and unsafe with untrusted input.
-- **Hashing file contents:** exact, but reads every file on each request, which the cache exists to avoid.
-- **Hashing only the constructor's file list (4.4 behavior):** missed edits to `.env.local` and `.env.{env}` under `bootEnv()`.
+## Alternatives Considered
+
+| Alternative | Why not |
+|---|---|
+| APCu | requires ext-apcu and is per-SAPI. |
+| JSON file | `json_decode()` on every request is slower than an OPcache-backed `include`. |
+| `serialize()` | slower than `include` for arrays and unsafe with untrusted input. |
+| Hashing file contents | exact, but reads every file on each request, which the cache exists to avoid. |
+| Hashing only the constructor's file list (4.4 behavior) | missed edits to `.env.local` and `.env.{env}` under `bootEnv()`. |
+
+## References
+
+- ARFA 1.3 P5 (Observability).
+- SPEC-001; ADR-004.
+- PHP manual: OPcache, `opcache_invalidate()`.
+- Errata applied by the 4.5.0 review (CODE-REVIEW.md): E-001, E-004, E-011.

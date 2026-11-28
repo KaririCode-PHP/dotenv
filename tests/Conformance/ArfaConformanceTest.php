@@ -59,6 +59,19 @@ final class ArfaConformanceTest extends TestCase
     /** Comment criteria C2–C5 of Spec V4.3.3 §17; C1 is the summary sentence that opens the docblock. */
     private const array COMMENT_MARKERS = ['Preconditions:', 'Thread-safety:', 'Side effects:', 'Example', 'References:'];
 
+    private const array ADR_SECTIONS = [
+        '## Status',
+        '## Date',
+        '## Context',
+        '## Decision',
+        '## Consequences',
+        '## Alternatives Considered',
+        '## References',
+    ];
+
+    /** Records of the 2026-09-29 review, which cited the Spec of its time. */
+    private const array HISTORICAL_RECORDS = ['CHANGELOG.md', 'docs/CODE-REVIEW.md'];
+
     /** The eight gates of Spec V4.3.3 §29.1. */
     private const array QUALITY_GATES = ['test', 'test-conformance', 'phpstan', 'psalm', 'cs-check', 'complexity', 'mutation', 'security'];
 
@@ -471,7 +484,68 @@ final class ArfaConformanceTest extends TestCase
         self::assertGreaterThan(0, $actions);
     }
 
+    // ── Documentation ────────────────────────────────────────────────────
+
+    #[Test]
+    public function documentationFollowsTheCanonicalLayout(): void
+    {
+        $adrs = self::glob('/docs/adr/ADR-*.md');
+        self::assertCount(11, $adrs);
+
+        foreach ($adrs as $path) {
+            $adr = (string) file_get_contents($path);
+
+            foreach (self::ADR_SECTIONS as $section) {
+                self::assertMatchesRegularExpression('/^' . preg_quote($section, '/') . '$/m', $adr, basename($path));
+            }
+        }
+
+        self::assertMatchesRegularExpression('/^- \*\*Status: (PENDING|PASS|FAIL)\*\*/m', self::document('docs/quality/QD-V433-COMPLIANCE.md'));
+
+        foreach (['## Threat Model', '## ASVS 5.0', '## Supply Chain'] as $section) {
+            self::assertStringContainsString($section, self::document('SECURITY.md'));
+        }
+
+        foreach (['## [4.5.0]', '### Spec V4.3.3 conformance (2026-11-28)', '**Breaking**', '**Fixed**'] as $heading) {
+            self::assertStringContainsString($heading, self::document('CHANGELOG.md'));
+        }
+    }
+
+    #[Test]
+    public function documentationAndSourcesCiteTheCurrentSpec(): void
+    {
+        $texts = self::sourceFiles();
+
+        foreach (['README.md', 'SECURITY.md', 'CONTRIBUTING.md', ...self::markdownUnder('docs')] as $relative) {
+            if (!in_array(needle: $relative, haystack: self::HISTORICAL_RECORDS, strict: true)) {
+                $texts[$relative] = self::document($relative);
+            }
+        }
+
+        foreach ($texts as $relative => $text) {
+            self::assertDoesNotMatchRegularExpression('/Spec V4\.0\b|Specification V4\.0\b|\bE-013\b/', $text, $relative . ': cite Spec V4.3.3 and its errata numbers');
+        }
+    }
+
     // ── Helpers ──────────────────────────────────────────────────────────
+
+    /** @return list<string> */
+    private static function markdownUnder(string $directory): array
+    {
+        $root = (string) realpath(self::ROOT);
+        $files = [];
+        $iterator = new \RecursiveIteratorIterator(new \RecursiveDirectoryIterator($root . '/' . $directory, \FilesystemIterator::SKIP_DOTS));
+
+        foreach ($iterator as $file) {
+            if ($file instanceof \SplFileInfo && $file->getExtension() === 'md') {
+                $files[] = substr($file->getPathname(), strlen($root) + 1);
+            }
+        }
+
+        sort($files);
+
+        return $files;
+    }
 
     /** printf-family values are variadic and have no names. */
     private static function isVariadicFormatting(Node\Expr\CallLike $call): bool

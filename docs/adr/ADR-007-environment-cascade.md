@@ -1,12 +1,12 @@
 # ADR-007: Environment-Aware Cascade Loading
 
-| Field | Value |
-|---|---|
-| **Status** | Accepted |
-| **Introduced** | 4.2.0 |
-| **ARFA 1.3** | P4 (Protocol Agnosticism) |
-| **Errata** | E-011 |
-| **Date** | 2026-02-28 · revised 2026-09-29 (4.5.0) |
+## Status
+
+Accepted — introduced in 4.2.0.
+
+## Date
+
+2026-02-28 · revised 2026-09-29 (4.5.0)
 
 ## Context
 
@@ -84,12 +84,28 @@ public function bootEnv(?string $environmentName = null): void
 
 ## Consequences
 
-**Positive:**
+### Positive
+
 - Single `.env` committed to VCS with environment-specific overrides — no duplication.
 - Developers customize freely via `.env.local` without affecting teammates.
 - Test reproducibility guaranteed by skipping `.env.test.local`.
 - Compatible with cache: deploy pipeline dumps cache after cascade resolution.
 
-**Negative:**
+### Negative
+
 - Four-layer cascade can be confusing for debugging ("which file set this value?"). The `debug()` method mitigates this by reporting the source file for each variable.
 - Layer 2 (`.env.local`) loads before the environment is resolved, meaning it cannot be environment-specific. This is intentional — `.env.local` is for machine-specific overrides (paths, ports), not environment-specific logic.
+
+## Alternatives Considered
+
+| Alternative | Why not |
+|---|---|
+| Separate complete files per environment | duplicated values drift apart; the cascade keeps one base and small overrides |
+| Load `.env.local` after the environment file | a machine override could no longer be overridden by `.env.{env}.local`, the most specific layer |
+| Read `.env.test.local` like the other local files | one developer's file would change the test results of a suite meant to be reproducible |
+
+## References
+
+- ARFA 1.3 P4 (Protocol Agnosticism).
+- SPEC-001; ADR-005, ADR-006.
+- Errata applied by the 4.5.0 review (CODE-REVIEW.md): E-011.

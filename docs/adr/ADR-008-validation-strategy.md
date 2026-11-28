@@ -1,12 +1,12 @@
 # ADR-008: Batch Error Validation with Fluent DSL
 
-| Field | Value |
-|---|---|
-| **Status** | Accepted |
-| **Introduced** | 4.1.0 |
-| **ARFA 1.3** | P5 (Observability) |
-| **Errata** | E-011 |
-| **Date** | 2026-02-28 · revised 2026-09-29 (4.5.0) |
+## Status
+
+Accepted — introduced in 4.1.0.
+
+## Date
+
+2026-02-28 · revised 2026-09-29 (4.5.0)
 
 ## Context
 
@@ -127,13 +127,30 @@ $validator->custom('VAR_NAME', fn(string $v) => strlen($v) >= 8, '{name} must be
 
 ## Consequences
 
-**Positive:**
+### Positive
+
 - All errors surfaced in one pass — setup/debugging cycle reduced from O(n) restarts to O(1).
 - Fluent API is readable as a specification document.
 - Optional variables (`ifPresent()`) are validated only when set, without false positives.
 - Custom rules require no subclassing — closures or `ValidationRule` implementations work equally.
 - `{name}` placeholder in messages enables reusable rule instances across variables.
 
-**Negative:**
+### Negative
+
 - Rule execution order within a variable is insertion order, not dependency order. A `between()` rule on a non-integer value will fail with a between error rather than a type error. Mitigation: chain `isInteger()` before `between()` — both failures will be reported.
 - `$currentTargets` state makes the validator stateful during construction. This is acceptable because the validator is a short-lived builder object, not a long-lived service.
+
+## Alternatives Considered
+
+| Alternative | Why not |
+|---|---|
+| Fail on the first broken rule | the fix-one-discover-one loop the decision removes |
+| Attribute-based validation on a config class | needs a class per application and reflection at boot, for rules a fluent list states directly |
+| A validation library dependency | breaks ADR-001 for a handful of rules the package implements in a few lines each |
+
+## References
+
+- ARFA 1.3 P5 (Observability).
+- SPEC-005, SPEC-006.
+- ADR-010 (`ValidationException`, ENV_2730–ENV_2732).
+- Errata applied by the 4.5.0 review (CODE-REVIEW.md): E-011.

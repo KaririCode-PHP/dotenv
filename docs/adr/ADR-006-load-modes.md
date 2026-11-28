@@ -1,12 +1,12 @@
 # ADR-006: Three Load Modes for Environment Variable Precedence
 
-| Field | Value |
-|---|---|
-| **Status** | Accepted |
-| **Introduced** | 4.0.0 |
-| **ARFA 1.3** | P1 (Immutable State Transformation) |
-| **Errata** | E-011 (`ImmutableException::alreadyDefined()`) |
-| **Date** | 2026-02-28 · revised 2026-09-29 (4.5.0) |
+## Status
+
+Accepted — introduced in 4.0.0.
+
+## Date
+
+2026-02-28 · revised 2026-09-29 (4.5.0)
 
 ## Context
 
@@ -77,12 +77,29 @@ if ($preExisting && $this->configuration->loadMode === LoadMode::SkipExisting) {
 
 ## Consequences
 
-**Positive:**
+### Positive
+
 - Explicit control over precedence — no guessing which value is active.
 - Safe default (Immutable) prevents silent credential conflicts in production.
 - The same pre-existing rule drives all modes, so cascade overrides behave identically in each.
 - Under SkipExisting, derived values (DSNs, URLs) stay consistent with the variables they reference.
 
-**Negative:**
+### Negative
+
 - Immutable mode can cause startup failures if the deployment pipeline sets variables that also appear in `.env`. This is by design — the failure surfaces the misconfiguration.
 - SkipExisting can hide stale `.env` values: pre-existing process variables always win.
+
+## Alternatives Considered
+
+| Alternative | Why not |
+|---|---|
+| Always let the process win | local development, where `.env` should override stale shell variables, would need workarounds |
+| Always let the file win | secrets injected by an orchestrator would be replaced by the defaults committed in `.env` |
+| A per-variable precedence list | configuration that grows with every variable, for what one mode per load expresses |
+
+## References
+
+- ARFA 1.3 P1 (Immutable State Transformation).
+- SPEC-001; ADR-007.
+- ADR-010 (`ImmutableException`, ENV_2711).
+- Errata applied by the 4.5.0 review (CODE-REVIEW.md): E-011 (`ImmutableException::alreadyDefined()`).

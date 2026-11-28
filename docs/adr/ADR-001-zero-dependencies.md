@@ -1,12 +1,14 @@
 # ADR-001: Zero External Dependencies
 
-| Field | Value |
-|---|---|
-| **Status** | Accepted; amended by ADR-010 (4.5.0) |
-| **Introduced** | 4.0.0 |
-| **ARFA 1.3** | P4 (Protocol Agnosticism) |
-| **Errata** | E-012 |
-| **Date** | 2026-02-28 · revised 2026-09-29 (4.5.0) |
+## Status
+
+Accepted — introduced in 4.0.0.
+
+Amended by ADR-010 (4.5.0): The package now requires `kariricode/contract` and `kariricode/exception`, the two packages KaririCode Specification V4.3.3 §31 allows every component: interfaces, the exception family bases and the code table contract. Neither has a runtime dependency beyond PHP, so the reasons given below still hold: no third-party code, no transitive advisories, and a loader that runs before any container. Development tools no longer live in `require-dev` at all; kcode installs them into `.kcode/` (ADR-009).
+
+## Date
+
+2026-02-28 · revised 2026-09-29 (4.5.0)
 
 ## Context
 
@@ -31,27 +33,35 @@ Development dependencies (PHPUnit, PHPStan, PHP-CS-Fixer) are in `require-dev` o
 
 ## Consequences
 
-**Positive:**
+### Positive
+
 - No dependency conflicts — safe to install in any project regardless of existing packages.
 - No security advisory surface from transitive dependencies.
 - Minimal autoloader footprint — only `KaririCode\Dotenv\` namespace.
 - No version constraint negotiation during `composer update`.
 - Portable: works in any PHP 8.4+ environment without additional setup.
 
-**Negative:**
+### Negative
+
 - Features like YAML parsing, remote secret fetching, or Vault integration must be implemented from scratch or delegated to application-level code.
 - Encryption requires ext-openssl (bundled in standard PHP distributions but may be absent in minimal Docker images).
 
-**Mitigations:**
+### Mitigations
+
 - ext-openssl is listed in `suggest` rather than `require` — encryption is opt-in.
 - The `VariableProcessor` contract allows application-level extensions without modifying the package.
 
-## Amendment (ADR-010, 4.5.0)
+## Alternatives Considered
 
-The package now requires `kariricode/contract` and `kariricode/exception`,
-the two packages KaririCode Specification V4.3.3 §31 allows every
-component: interfaces, the exception family bases and the code table
-contract. Neither has a runtime dependency beyond PHP, so the reasons above
-still hold: no third-party code, no transitive advisories, and a loader
-that runs before any container. Development tools no longer live in
-`require-dev` at all; kcode installs them into `.kcode/` (ADR-009).
+| Alternative | Why not |
+|---|---|
+| A YAML or INI parser package | a third-party runtime dependency in the first component every application loads, for syntax the .env format does not need |
+| A remote secrets client (Vault, cloud KMS) in the package | a network dependency at boot; applications that need one compose it through `VariableProcessor` or a resolver of their own |
+| symfony/dotenv or vlucas/phpdotenv underneath | their dependency trees and release cycles would become every KaririCode application's, and neither offers per-value encryption or the validated cache |
+
+## References
+
+- ARFA 1.3 P4 (Protocol Agnosticism).
+- KaririCode Specification V4.3.3 §31 (runtime dependencies).
+- ADR-009, ADR-010 (amendment).
+- Errata applied by the 4.5.0 review (CODE-REVIEW.md): E-012.

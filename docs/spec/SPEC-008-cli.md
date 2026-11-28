@@ -139,7 +139,7 @@ Errors (STDERR, exit 1, file not written):
 
 ```
 ✗ No decryption key provided. Use --key=<hex> or set DOTENV_PRIVATE_KEY.
-✗ Decryption failed — wrong key or corrupted payload.
+✗ [ENV_2752] Decryption failed — wrong key or corrupted payload.
 ```
 
 ### 4.5 `cache:dump`
@@ -239,7 +239,7 @@ Errors go to STDERR prefixed with `✗`; normal output goes to STDOUT, so it can
 vendor/bin/kariricode-dotenv debug 2>/dev/null | grep DB_
 ```
 
-Every `DotenvException` is caught at the entry point and reported as `✗ <message>` with exit 1 (no stack trace).
+Every `DotenvException` is caught at the entry point and reported as `✗ <message>` with exit 1 (no stack trace); the message starts with the exception's code, as in `✗ [ENV_2710] Environment file not found or not readable: "/app/.env"` (ADR-010).
 
 ## 7. Autoload Resolution
 

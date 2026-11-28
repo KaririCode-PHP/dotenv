@@ -5,16 +5,16 @@
 | **Version** | 4.5.0 |
 | **ARFA** | 1.3 |
 | **Conformance Level** | Level 1 (Structural) — P1, P4, P5 |
-| **Quality Spec** | KaririCode Code Quality Specification V4.0 |
+| **Quality Spec** | KaririCode Specification V4.3.3 |
 | **PHP** | ≥ 8.4 |
-| **Runtime dependencies** | none (ext-openssl optional, for encryption) |
-| **Date** | 2026-09-29 |
+| **Runtime dependencies** | kariricode/contract ^2.11, kariricode/exception ^2.0.2 (ext-openssl optional, for encryption) |
+| **Date** | 2026-09-29 · revised 2026-11-28 (Spec V4.3.3 conformance) |
 
 ---
 
 ## 1. Overview
 
-KaririCode\Dotenv loads `.env` files into typed, validated, optionally encrypted configuration. It is a Layer 1 foundation component: it runs before the application container exists, so it depends on nothing but PHP.
+KaririCode\Dotenv loads `.env` files into typed, validated, optionally encrypted configuration. It is a Layer 1 foundation component: it runs before the application container exists, so it depends on nothing but PHP and the two packages every KaririCode component may use, kariricode/contract and kariricode/exception (ADR-001, ADR-010).
 
 Feature specifications:
 
@@ -77,14 +77,16 @@ The same pipeline runs for values read from the cache, so processors, custom typ
 
 ---
 
-## 4. Type Taxonomy Compliance (Spec V4.0 §3)
+## 4. Type Taxonomy Compliance (Spec V4.3.3)
 
 | Category | PHP declaration | Classes |
 |---|---|---|
-| Value Object | `final readonly class` | `DotenvConfiguration`, `EnvironmentVariable`, `KeyPair`, `CacheSnapshot`, `EnvEntry`, `CipherResult`, `InterpolationContext` |
+| Value Object | `final readonly class` | `DotenvConfiguration`, `EnvironmentVariable`, `KeyPair`, `CacheSnapshot`, `EnvEntry`, `CipherResult`, `InterpolationContext`, `ValueContext` |
 | Stateless service | `final readonly class` | `DotenvParser`, `SchemaParser`, `Encryptor`, `EnvFileScanner`, `EnvFileCipher`, `PhpFileCache`, all detectors, casters, processors and rules |
 | Entity | `final class` | `Dotenv` (load state), `TypeSystem` (detector registry), `EnvironmentValidator` (rule builder) |
-| Exception | `abstract` base + `final` leaves | see §5 |
+| Exception | marker interface + `final` leaves on the kariricode/exception family bases | see §5 |
+| Bridge | `final readonly class` | `Integration\DotenvEnvironmentResolver` (ADR-011) |
+| Code table | backed `enum` (E-003: `getCode()` reads the integer) | `Exception\EnvCode` |
 | Enum | pure `enum` | `LoadMode`, `ValueType` |
 
 ### Serialization Policy (E-001, E-004)
@@ -136,14 +138,17 @@ Messages never contain key material, payloads or decrypted values; paths and nam
 {
     "extra": {
         "kariricode": {
-            "component": "dotenv",
-            "version": "4.5.0",
-            "arfa": { "version": "1.3", "level": 1, "principles": ["P1", "P4", "P5"] },
-            "spec": "V4.0"
+            "arfa": { "version": "1.3", "level": 1 },
+            "asvs": { "version": "5.0", "level": 2 },
+            "spec": "4.3.3",
+            "error-code-range": "ENV 2700–2799"
         }
     }
 }
 ```
+
+The conformance suite (`tests/Conformance`) checks this block, and every
+rule of this section a tool can check.
 
 ---
 
@@ -168,7 +173,7 @@ PHP ≥ 8.4 is the ecosystem baseline. The code relies on `readonly` classes (8.
 
 ## 9. Ecosystem Integration
 
-Zero runtime dependencies. Consumers read values through `env()`, `Dotenv::get()`, `$_ENV` or `$_SERVER`. The CLI ships in the same package (`vendor/bin/kariricode-dotenv`).
+The package requires kariricode/contract and kariricode/exception only. Consumers read values through `env()`, `Dotenv::get()`, `$_ENV` or `$_SERVER`, or through kariricode/contract's `Environment\EnvironmentResolver`, which `Integration\DotenvEnvironmentResolver` implements over a loaded instance (ADR-011). Exceptions belong to the contract families and carry `EnvCode` codes (§5). The CLI ships in the same package (`vendor/bin/kariricode-dotenv`).
 
 ---
 
@@ -195,40 +200,38 @@ Zero runtime dependencies. Consumers read values through `env()`, `Dotenv::get()
 | (root) | 2 | `Dotenv` façade, `env()` helper |
 | Cache/ | 2 | `PhpFileCache`, `CacheSnapshot` |
 | Contract/ | 4 | Extension interfaces |
-| Core/ | 4 | Parser, interpolation context, scanner, entry |
+| Core/ | 5 | Parser, value context, interpolation context, scanner, entry |
 | Enum/ | 2 | `LoadMode`, `ValueType` |
-| Exception/ | 9 | Abstract base + 8 semantic exceptions |
+| Exception/ | 10 | Marker interface, `EnvCode`, 8 exceptions |
+| Integration/ | 1 | `DotenvEnvironmentResolver` |
 | Processor/ | 4 | Built-in processors |
 | Schema/ | 1 | `.env.schema` parser |
 | Security/ | 4 | Encryptor, key pair, file cipher, result |
 | Type/ | 13 | Type system, 6 detectors, 6 casters |
 | Validation/ | 11 | Validator + 10 rules |
 | ValueObject/ | 2 | Configuration, variable |
-| **Total src** | **58** | |
+| **Total src** | **61** | |
 
-Tests: 15 files (unit + integration, including CLI process tests).
+Tests: 28 files in three suites — unit, integration (real files in a
+temporary directory, the CLI as a process) and conformance.
 
 ---
 
 ## 12. Quality Gates
 
-Measured on 2026-09-29, PHP 8.4.23 (details in `docs/CODE-REVIEW.md`):
-
-| Gate | Result |
-|---|---|
-| PHPUnit | 236 tests, 432 assertions, 0 failures, 0 warnings |
-| PHPStan level 9 (`src`, `bin`) | 0 errors, no ignores, no baseline |
-| PHP-CS-Fixer (PSR-12 + PHP 8.4 migration) | 0 of 74 files to fix |
-| Errata E-001–E-012 | 12/12 |
-| Section markers (E-008) | 78/78 at 72 characters |
-| Mutation check | 11/11 reintroduced defects caught |
+The gates of Spec V4.3.3 §29.1 run through KaririCode Devkit (ADR-009);
+`docs/quality/QD-V433-COMPLIANCE.md` records the latest measurement: 412
+tests, PHPStan max and Psalm level 1 with no errors, PER-CS 3.0, the §13
+budgets with an empty baseline, line coverage of 99.34 % and a
+covered-code MSI of 95.14 % (gate: 80 %). The review of 2026-09-29, before these gates, is in
+`docs/CODE-REVIEW.md`.
 
 ---
 
 ## 13. References
 
 - [ARFA-1.3] Silva, W. "ARFA Technical Specification v1.3." 2026.
-- [SPEC-V4.0] Silva, W. "KaririCode Code Quality Specification V4.0." 2026.
+- [SPEC-V4.3.3] Silva, W. "KaririCode Specification V4.3.3." 2026.
 - [POSIX] IEEE Std 1003.1 — Shell Command Language, variable assignment.
 - [NIST-GCM] NIST SP 800-38D — Galois/Counter Mode (GCM).
 - [RFC-4648] The Base16, Base32, and Base64 Data Encodings.
