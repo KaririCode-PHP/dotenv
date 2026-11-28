@@ -17,7 +17,22 @@ use KaririCode\Dotenv\Exception\EncryptionException;
  * Uses PHP's ext-openssl (bundled in standard PHP distributions).
  * No external tools or runtimes required — decryption is local and instant.
  *
- * @package KaririCode\Dotenv
+ * Preconditions: ext-openssl is loaded; the key is 32 raw bytes or 64 hex
+ * characters.
+ *
+ * Thread-safety: immutable; safe to share. Every encrypt() draws a fresh
+ * nonce from random_bytes().
+ *
+ * Side effects: none beyond reading the CSPRNG.
+ *
+ * Example:
+ *
+ *     $encryptor = new Encryptor(KeyPair::generate()->privateKey);
+ *     $stored = $encryptor->encrypt('s3cr3t'); // encrypted:…
+ *     $plain = $encryptor->decrypt($stored);
+ *
+ * References: ADR-004, SPEC-004. ASVS 5.0 V11 (cryptography).
+ *
  * @since   4.3.0
  */
 final readonly class Encryptor
@@ -57,14 +72,14 @@ final readonly class Encryptor
         $tag = '';
 
         $ciphertext = openssl_encrypt(
-            $plaintext,
-            self::CIPHER,
-            $this->key,
-            OPENSSL_RAW_DATA,
-            $nonce,
-            $tag,
-            '',
-            self::TAG_LENGTH,
+            data: $plaintext,
+            cipher_algo: self::CIPHER,
+            passphrase: $this->key,
+            options: OPENSSL_RAW_DATA,
+            iv: $nonce,
+            tag: $tag,
+            aad: '',
+            tag_length: self::TAG_LENGTH,
         );
 
         if ($ciphertext === false) {
@@ -93,12 +108,12 @@ final readonly class Encryptor
         }
 
         $plaintext = openssl_decrypt(
-            substr($raw, self::NONCE_LENGTH, -self::TAG_LENGTH),
-            self::CIPHER,
-            $this->key,
-            OPENSSL_RAW_DATA,
-            substr($raw, 0, self::NONCE_LENGTH),
-            substr($raw, -self::TAG_LENGTH),
+            data: substr(string: $raw, offset: self::NONCE_LENGTH, length: -self::TAG_LENGTH),
+            cipher_algo: self::CIPHER,
+            passphrase: $this->key,
+            options: OPENSSL_RAW_DATA,
+            iv: substr(string: $raw, offset: 0, length: self::NONCE_LENGTH),
+            tag: substr($raw, -self::TAG_LENGTH),
         );
 
         if ($plaintext === false) {

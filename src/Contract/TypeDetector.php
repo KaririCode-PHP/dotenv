@@ -12,7 +12,20 @@ use KaririCode\Dotenv\Enum\ValueType;
  * Implementations are ordered by priority (higher = checked first).
  * The first detector returning a non-null ValueType wins.
  *
- * @package KaririCode\Dotenv
+ * Preconditions: detect() looks at the raw string only and returns null
+ * when the value is not its type.
+ *
+ * Thread-safety: implementations are stateless.
+ *
+ * Side effects: none in the built-in detectors; an implementation must add
+ * none.
+ *
+ * Example:
+ *
+ *     $dotenv->addTypeDetector(new BooleanDetector());
+ *
+ * References: ADR-003, SPEC-003. ARFA 1.3 P1: pure detection.
+ *
  * @since   4.0.0 ARFA 1.3
  */
 interface TypeDetector

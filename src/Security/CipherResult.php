@@ -7,9 +7,19 @@ namespace KaririCode\Dotenv\Security;
 /**
  * Outcome of encrypting or decrypting a whole .env file.
  *
- * Spec V4.0 Value Object: final readonly.
+ * Preconditions: `$changed` and `$skipped` list variable names, never values.
  *
- * @package KaririCode\Dotenv
+ * Thread-safety: immutable; safe to share between fibers and requests.
+ *
+ * Side effects: none.
+ *
+ * Example:
+ *
+ *     $result = new EnvFileCipher(new Encryptor($key))->encrypt($content);
+ *     file_put_contents('.env', $result->content);
+ *
+ * References: ADR-004, SPEC-008. ARFA 1.3 P1: an immutable value.
+ *
  * @since   4.5.0
  */
 final readonly class CipherResult

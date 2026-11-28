@@ -30,8 +30,8 @@ use KaririCode\Dotenv\ValueObject\EnvironmentVariable;
  *
  * Combines auto type casting, native AES-256-GCM encryption,
  * OPcache-friendly caching, fluent validation DSL, environment-aware
- * cascade loading, and variable processors — all with zero external
- * dependencies.
+ * cascade loading, and variable processors, with no dependency beyond
+ * kariricode/contract and kariricode/exception (ADR-001, ADR-010).
  *
  * ## Quick Start
  *
@@ -60,13 +60,30 @@ use KaririCode\Dotenv\ValueObject\EnvironmentVariable;
  * $dotenv->bootEnv(); // .env → .env.local → .env.{APP_ENV} → .env.{APP_ENV}.local
  * ```
  *
- * Spec V4.0 Entity: final, mutable load state behind a narrow API.
  * ARFA 1.3 Level 1 (Structural):
  * - P1 Immutable State: DotenvConfiguration and EnvironmentVariable are readonly.
  * - P4 Protocol Agnostic: the parser accepts any string content.
  * - P5 Continuous Observability: debug() reports source, type, override and encryption.
  *
- * @package KaririCode\Dotenv
+ * Preconditions: the directory exists; load(), safeLoad() and bootEnv() run
+ * once per instance, before the application reads its configuration.
+ *
+ * Thread-safety: one instance per process, used from one fiber; loading
+ * writes the superglobals and the process environment, which every fiber
+ * shares.
+ *
+ * Side effects: reads the .env files and the cache; writes $_ENV, $_SERVER
+ * and putenv() as configured; dumpCache() and clearCache() write and delete
+ * the cache file.
+ *
+ * Example:
+ *
+ *     $dotenv = new Dotenv(__DIR__);
+ *     $dotenv->bootEnv(); // .env, .env.local, .env.{APP_ENV}, .env.{APP_ENV}.local
+ *     $port = $dotenv->get('DB_PORT', 5432);
+ *
+ * References: ADR-002, ADR-005 to ADR-008, SPEC-001. ARFA 1.3 P1, P4, P5.
+ *
  * @since   4.0.0 ARFA 1.3
  */
 final class Dotenv
@@ -161,7 +178,7 @@ final class Dotenv
             $this->assertValidEnvironmentName($requested);
         }
 
-        if ($this->loadFromCache(CacheSnapshot::STRATEGY_BOOT_ENV, $requested, $basePath)) {
+        if ($this->loadFromCache(strategy: CacheSnapshot::STRATEGY_BOOT_ENV, requested: $requested, basePath: $basePath)) {
             return;
         }
 
@@ -183,7 +200,7 @@ final class Dotenv
             $this->loadFile("{$basePath}.{$envName}.local", required: false);
         }
 
-        $this->markLoaded(CacheSnapshot::STRATEGY_BOOT_ENV, $envName, $requested, $sources);
+        $this->markLoaded(strategy: CacheSnapshot::STRATEGY_BOOT_ENV, environment: $envName, requested: $requested, sources: $sources);
     }
 
     // ── Validation ───────────────────────────────────────────────────────
@@ -334,12 +351,12 @@ final class Dotenv
         }
 
         new PhpFileCache()->dump($path, new CacheSnapshot(
-            $this->strategy,
-            $this->environment,
-            $this->requestedEnvironment,
-            $this->sourceFiles,
-            $values,
-            $this->encryptor !== null,
+            strategy: $this->strategy,
+            environment: $this->environment,
+            requestedEnvironment: $this->requestedEnvironment,
+            sources: $this->sourceFiles,
+            variables: $values,
+            encrypted: $this->encryptor !== null,
         ));
     }
 
@@ -375,7 +392,7 @@ final class Dotenv
 
     private function loadConfiguredFiles(bool $required): void
     {
-        if ($this->loadFromCache(CacheSnapshot::STRATEGY_LOAD, null, null)) {
+        if ($this->loadFromCache(strategy: CacheSnapshot::STRATEGY_LOAD, requested: null, basePath: null)) {
             return;
         }
 
@@ -383,7 +400,7 @@ final class Dotenv
             $this->loadFile($filePath, $required);
         }
 
-        $this->markLoaded(CacheSnapshot::STRATEGY_LOAD, null, null, $this->filePaths);
+        $this->markLoaded(strategy: CacheSnapshot::STRATEGY_LOAD, environment: null, requested: null, sources: $this->filePaths);
     }
 
     /**
@@ -405,17 +422,17 @@ final class Dotenv
      */
     private function loadFromCache(string $strategy, ?string $requested, ?string $basePath): bool
     {
-        $snapshot = $this->matchingSnapshot($strategy, $requested, $basePath);
+        $snapshot = $this->matchingSnapshot(strategy: $strategy, requested: $requested, basePath: $basePath);
 
         if ($snapshot === null) {
             return false;
         }
 
         foreach ($snapshot->variables as $name => $value) {
-            $this->setVariable($name, $value, 'cache');
+            $this->setVariable(name: $name, sourceValue: $value, source: 'cache');
         }
 
-        $this->markLoaded($strategy, $snapshot->environment, $requested, $snapshot->sources);
+        $this->markLoaded(strategy: $strategy, environment: $snapshot->environment, requested: $requested, sources: $snapshot->sources);
 
         return true;
     }
@@ -457,16 +474,16 @@ final class Dotenv
         }
 
         $parsed = $this->parser->parse(
-            $content,
-            $filePath,
-            $this->configuration->strictNames,
-            $this->interpolationContext(),
+            content: $content,
+            filePath: $filePath,
+            strictNames: $this->configuration->strictNames,
+            context: $this->interpolationContext(),
         );
 
         $source = basename($filePath);
 
         foreach ($parsed as $name => $value) {
-            $this->setVariable($name, $value, $source);
+            $this->setVariable(name: $name, sourceValue: $value, source: $source);
         }
     }
 
@@ -486,9 +503,9 @@ final class Dotenv
         $encryptor = $this->encryptor;
 
         return new InterpolationContext(
-            $inherited,
-            $this->configuration->loadMode === LoadMode::SkipExisting ? $this->preExistingEnvironment() : [],
-            $encryptor === null ? null : static fn(string $value): string => $encryptor->decrypt($value),
+            inherited: $inherited,
+            locked: $this->configuration->loadMode === LoadMode::SkipExisting ? $this->preExistingEnvironment() : [],
+            valueFilter: $encryptor === null ? null : static fn(string $value): string => $encryptor->decrypt($value),
         );
     }
 
@@ -505,7 +522,7 @@ final class Dotenv
 
         $type = $this->configuration->typeCasting ? $this->typeSystem->detect($value) : ValueType::String;
         /** @var mixed $typedValue casters and processors may return any value */
-        $typedValue = $this->applyProcessors($name, $value, $this->typeSystem->cast($value, $type));
+        $typedValue = $this->applyProcessors(name: $name, value: $value, typedValue: $this->typeSystem->cast($value, $type));
 
         $this->variables[$name] = new EnvironmentVariable(
             name: $name,
@@ -661,7 +678,7 @@ final class Dotenv
             return true;
         }
 
-        $regex = '/\A' . str_replace(['\*', '\?'], ['.*', '.'], preg_quote($pattern, '/')) . '\z/';
+        $regex = '/\A' . str_replace(search: ['\*', '\?'], replace: ['.*', '.'], subject: preg_quote($pattern, '/')) . '\z/';
 
         return preg_match($regex, $name) === 1;
     }

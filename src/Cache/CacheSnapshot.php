@@ -5,11 +5,24 @@ declare(strict_types=1);
 namespace KaririCode\Dotenv\Cache;
 
 /**
- * Contents of a validated cache file.
+ * The contents of a validated cache file: the strategy and environment
+ * request that wrote it, the source files it fingerprints, and the raw
+ * values in load order.
  *
- * Spec V4.0 Value Object: final readonly.
+ * Preconditions: `$sources` lists the files in load order; `$variables`
+ * holds the raw strings as loaded, encrypted when `$encrypted` is true.
  *
- * @package KaririCode\Dotenv
+ * Thread-safety: immutable; safe to share between fibers and requests.
+ *
+ * Side effects: none.
+ *
+ * Example:
+ *
+ *     $snapshot = new PhpFileCache()->load(__DIR__ . '/.env.cache.php');
+ *     $fresh = $snapshot !== null && $snapshot->strategy === CacheSnapshot::STRATEGY_LOAD;
+ *
+ * References: ADR-005. ARFA 1.3 P1: an immutable value.
+ *
  * @since   4.5.0
  */
 final readonly class CacheSnapshot

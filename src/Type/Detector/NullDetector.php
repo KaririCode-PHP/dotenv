@@ -14,7 +14,18 @@ use KaririCode\Dotenv\Enum\ValueType;
  * empty string, not null. This matches POSIX behavior and prevents
  * data loss when distinguishing between `FOO=` and `FOO=null`.
  *
- * @package KaririCode\Dotenv
+ * Preconditions: none; any string may be passed.
+ *
+ * Thread-safety: stateless; one instance serves every caller.
+ *
+ * Side effects: none.
+ *
+ * Example:
+ *
+ *     new NullDetector()->detect('(null)'); // ValueType::Null
+ *
+ * References: ADR-003, SPEC-003. ARFA 1.3 P1: pure detection.
+ *
  * @since   4.0.0 ARFA 1.3
  */
 final readonly class NullDetector implements TypeDetector
@@ -30,6 +41,6 @@ final readonly class NullDetector implements TypeDetector
     #[\Override]
     public function detect(string $value): ?ValueType
     {
-        return in_array($value, self::NULL_LITERALS, true) ? ValueType::Null : null;
+        return in_array(needle: $value, haystack: self::NULL_LITERALS, strict: true) ? ValueType::Null : null;
     }
 }

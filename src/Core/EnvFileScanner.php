@@ -13,7 +13,19 @@ namespace KaririCode\Dotenv\Core;
  * using the same escape rule as DotenvParser, so a PEM body is never
  * mistaken for separate lines.
  *
- * @package KaririCode\Dotenv
+ * Preconditions: the content is UTF-8 text; scan() does not validate names
+ * or values.
+ *
+ * Thread-safety: stateless; one instance serves every caller.
+ *
+ * Side effects: none.
+ *
+ * Example:
+ *
+ *     $entries = new EnvFileScanner()->scan((string) file_get_contents('.env'));
+ *
+ * References: SPEC-008, ADR-004. ARFA 1.3 P4: any string content, no I/O.
+ *
  * @since   4.5.0
  */
 final readonly class EnvFileScanner
@@ -25,7 +37,7 @@ final readonly class EnvFileScanner
      */
     public function scan(string $content): array
     {
-        $lines = explode("\n", str_replace(["\r\n", "\r"], "\n", $content));
+        $lines = explode("\n", str_replace(search: ["\r\n", "\r"], replace: "\n", subject: $content));
         $lineCount = count($lines);
         $entries = [];
 
@@ -34,7 +46,7 @@ final readonly class EnvFileScanner
             $trimmed = trim($line);
 
             if ($trimmed === '' || str_starts_with($trimmed, '#')
-                || preg_match(self::ASSIGNMENT_PATTERN, $line, $matches) !== 1
+                || preg_match(pattern: self::ASSIGNMENT_PATTERN, subject: $line, matches: $matches) !== 1
             ) {
                 $entries[] = new EnvEntry($line);
 

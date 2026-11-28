@@ -15,7 +15,18 @@ namespace KaririCode\Dotenv\Enum;
  *
  * ARFA 1.3 P1: Each case is an immutable identity — no backing value needed.
  *
- * @package KaririCode\Dotenv
+ * Preconditions: none.
+ *
+ * Thread-safety: an enum; immutable.
+ *
+ * Side effects: none.
+ *
+ * Example:
+ *
+ *     $isPort = $dotenv->variables()['DB_PORT']->type === ValueType::Integer;
+ *
+ * References: ADR-003, SPEC-003. ARFA 1.3 P1 and E-003: a pure enum.
+ *
  * @since   4.0.0 ARFA 1.3
  */
 enum ValueType

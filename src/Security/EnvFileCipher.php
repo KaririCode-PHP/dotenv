@@ -22,7 +22,18 @@ use KaririCode\Dotenv\Exception\ParseException;
  * Values containing `${VAR}` / `$VAR` references are left untouched:
  * encrypting them would freeze the reference at encryption time.
  *
- * @package KaririCode\Dotenv
+ * Preconditions: the content is a .env file the parser reads without errors.
+ *
+ * Thread-safety: immutable; safe to share between fibers and requests.
+ *
+ * Side effects: none.
+ *
+ * Example:
+ *
+ *     $result = new EnvFileCipher(new Encryptor($key))->encrypt((string) file_get_contents('.env'));
+ *
+ * References: ADR-004, SPEC-004, SPEC-008. ASVS 5.0 V11 (cryptography).
+ *
  * @since   4.5.0
  */
 final readonly class EnvFileCipher
@@ -44,7 +55,7 @@ final readonly class EnvFileCipher
                 return null;
             }
 
-            return $this->render($entry, $name, '"' . $this->encryptor->encrypt($value) . '"');
+            return $this->render(entry: $entry, name: $name, quotedValue: '"' . $this->encryptor->encrypt($value) . '"');
         });
     }
 
@@ -59,12 +70,12 @@ final readonly class EnvFileCipher
                 return null;
             }
 
-            return $this->render($entry, $name, $this->quote($this->encryptor->decrypt($value)));
+            return $this->render(entry: $entry, name: $name, quotedValue: $this->quote($this->encryptor->decrypt($value)));
         });
     }
 
     /**
-     * @param \Closure(string, string, EnvEntry): ?string $rewrite Returns new text, or null to keep the entry.
+     * @param \Closure(string $name, string $value, EnvEntry $entry): ?string $rewrite Returns new text, or null to keep the entry.
      */
     private function transform(string $content, \Closure $rewrite): CipherResult
     {
@@ -89,7 +100,7 @@ final readonly class EnvFileCipher
             }
 
             $value = $this->parser->parse($entry->text)[$name] ?? '';
-            $rewritten = $rewrite($name, $value, $entry);
+            $rewritten = $rewrite(name: $name, value: $value, entry: $entry);
 
             if ($rewritten === null) {
                 $blocks[] = $entry->text;
@@ -101,7 +112,7 @@ final readonly class EnvFileCipher
             $changed[] = $name;
         }
 
-        return new CipherResult(implode("\n", $blocks), $changed, $skipped);
+        return new CipherResult(content: implode("\n", $blocks), changed: $changed, skipped: $skipped);
     }
 
     private function render(EnvEntry $entry, string $name, string $quotedValue): string
@@ -139,7 +150,7 @@ final readonly class EnvFileCipher
         }
 
         if ($rawValue[0] !== '"') {
-            $unquoted = preg_replace('/\s+#.*\z/s', '', $rawValue) ?? $rawValue;
+            $unquoted = preg_replace(pattern: '/\s+#.*\z/s', replacement: '', subject: $rawValue) ?? $rawValue;
 
             return preg_match('/\$(\{[A-Za-z_]|[A-Za-z_])/', $unquoted) === 1;
         }
@@ -159,7 +170,7 @@ final readonly class EnvFileCipher
                 return false;
             }
 
-            if ($char === '$' && preg_match('/\A(\{[A-Za-z_]|[A-Za-z_])/', substr($rawValue, $i + 1, 2)) === 1) {
+            if ($char === '$' && preg_match('/\A(\{[A-Za-z_]|[A-Za-z_])/', substr(string: $rawValue, offset: $i + 1, length: 2)) === 1) {
                 return true;
             }
         }
@@ -175,13 +186,13 @@ final readonly class EnvFileCipher
         $first = $rawValue[0] ?? '';
 
         if ($first === '"' || $first === "'") {
-            $close = $first === '"' ? $this->closingDoubleQuote($rawValue) : strpos($rawValue, "'", 1);
+            $close = $first === '"' ? $this->closingDoubleQuote($rawValue) : strpos(haystack: $rawValue, needle: "'", offset: 1);
             $rest = $close === false ? '' : substr($rawValue, $close + 1);
 
-            return preg_match('/\A(\s+#.*)\z/s', $rest, $matches) === 1 ? $matches[1] : '';
+            return preg_match(pattern: '/\A(\s+#.*)\z/s', subject: $rest, matches: $matches) === 1 ? $matches[1] : '';
         }
 
-        return preg_match('/(\s+#.*)\z/s', $rawValue, $matches) === 1 ? $matches[1] : '';
+        return preg_match(pattern: '/(\s+#.*)\z/s', subject: $rawValue, matches: $matches) === 1 ? $matches[1] : '';
     }
 
     private function closingDoubleQuote(string $rawValue): int|false

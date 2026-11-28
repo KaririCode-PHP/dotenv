@@ -13,7 +13,18 @@ use KaririCode\Dotenv\Enum\ValueType;
  * Uses normalized lowercase comparison to match the same values the
  * BooleanCaster handles, avoiding asymmetry between detection and casting.
  *
- * @package KaririCode\Dotenv
+ * Preconditions: none; any string may be passed.
+ *
+ * Thread-safety: stateless; one instance serves every caller.
+ *
+ * Side effects: none.
+ *
+ * Example:
+ *
+ *     new BooleanDetector()->detect('off'); // ValueType::Boolean
+ *
+ * References: ADR-003, SPEC-003. ARFA 1.3 P1: pure detection.
+ *
  * @since   4.0.0 ARFA 1.3
  */
 final readonly class BooleanDetector implements TypeDetector
@@ -33,10 +44,10 @@ final readonly class BooleanDetector implements TypeDetector
     #[\Override]
     public function detect(string $value): ?ValueType
     {
-        if (in_array(strtolower($value), self::BOOLEAN_LITERALS, true)) {
+        if (in_array(needle: strtolower($value), haystack: self::BOOLEAN_LITERALS, strict: true)) {
             return ValueType::Boolean;
         }
 
-        return in_array($value, self::BOOLEAN_PARENTHESIZED, true) ? ValueType::Boolean : null;
+        return in_array(needle: $value, haystack: self::BOOLEAN_PARENTHESIZED, strict: true) ? ValueType::Boolean : null;
     }
 }

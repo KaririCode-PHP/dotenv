@@ -9,9 +9,21 @@ namespace KaririCode\Dotenv\Core;
  * (possibly spanning several lines) or a verbatim block (blank line,
  * comment, or text that is not a `NAME=value` assignment).
  *
- * Spec V4.0 Value Object: final readonly.
+ * Preconditions: `$name` is null for a verbatim block; `$rawValue` is the
+ * value as written, quotes and comment included.
  *
- * @package KaririCode\Dotenv
+ * Thread-safety: immutable; safe to share between fibers and requests.
+ *
+ * Side effects: none.
+ *
+ * Example:
+ *
+ *     foreach (new EnvFileScanner()->scan($content) as $entry) {
+ *         $names[] = $entry->isAssignment() ? $entry->name : null;
+ *     }
+ *
+ * References: SPEC-008. ARFA 1.3 P1: an immutable value.
+ *
  * @since   4.5.0
  */
 final readonly class EnvEntry

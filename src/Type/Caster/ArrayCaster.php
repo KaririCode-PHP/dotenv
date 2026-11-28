@@ -10,7 +10,18 @@ use KaririCode\Dotenv\Exception\ConversionException;
 /**
  * Decodes a JSON array string into a PHP list array.
  *
- * @package KaririCode\Dotenv
+ * Preconditions: the value passed the detector of the same type.
+ *
+ * Thread-safety: stateless; one instance serves every caller.
+ *
+ * Side effects: none.
+ *
+ * Example:
+ *
+ *     new ArrayCaster()->cast('[1, 2]'); // [1, 2]
+ *
+ * References: ADR-003, SPEC-003. ARFA 1.3 P1: pure conversion.
+ *
  * @since   4.0.0 ARFA 1.3
  */
 final readonly class ArrayCaster implements TypeCaster
@@ -24,7 +35,7 @@ final readonly class ArrayCaster implements TypeCaster
     #[\Override]
     public function cast(string $value): array
     {
-        $decoded = json_decode(trim($value), true, 512, JSON_THROW_ON_ERROR);
+        $decoded = json_decode(json: trim($value), associative: true, depth: 512, flags: JSON_THROW_ON_ERROR);
 
         if (!is_array($decoded) || !array_is_list($decoded)) {
             throw ConversionException::jsonStructureExpected('JSON array');

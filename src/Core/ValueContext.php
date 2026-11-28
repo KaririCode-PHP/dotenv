@@ -10,9 +10,21 @@ namespace KaririCode\Dotenv\Core;
  * token that stands for an escaped dollar until expansion, and the
  * expansion of references.
  *
- * @internal Built by DotenvParser for one parse() call.
+ * Preconditions: built by DotenvParser for one parse() call; `$lines` are
+ * the normalized lines of that content.
  *
- * @package KaririCode\Dotenv
+ * Thread-safety: immutable; safe to share between fibers and requests.
+ *
+ * Side effects: expand() runs the expander, which reads the variables
+ * parsed so far.
+ *
+ * Example:
+ *
+ *     $value = $values->expand('${HOST}:8080');
+ *
+ * References: SPEC-002 §5–6, ADR-009.
+ *
+ * @internal Built by DotenvParser for one parse() call.
  * @since   4.5.0
  */
 final readonly class ValueContext

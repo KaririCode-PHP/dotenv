@@ -340,7 +340,7 @@ function commandDiff(array $positional): int
 
     reportOnlyIn(basename($file1), $onlyIn1);
     reportOnlyIn(basename($file2), $onlyIn2);
-    reportDifferent(basename($file1), basename($file2), $different);
+    reportDifferent(label1: basename($file1), label2: basename($file2), different: $different);
 
     return 0;
 }
@@ -440,7 +440,7 @@ function parseArguments(array $arguments): array
         if ($equals === false) {
             $options[substr($argument, 2)] = true;
         } else {
-            $options[substr($argument, 2, $equals - 2)] = substr($argument, $equals + 1);
+            $options[substr(string: $argument, offset: 2, length: $equals - 2)] = substr($argument, $equals + 1);
         }
     }
 
@@ -477,7 +477,7 @@ function bootProject(array $options): Dotenv
         'immutable' => LoadMode::Immutable,
         'overwrite' => LoadMode::Overwrite,
         'skip-existing' => LoadMode::SkipExisting,
-        default => throw ConfigurationException::invalidOption('mode', $mode, 'immutable, overwrite, skip-existing'),
+        default => throw ConfigurationException::invalidOption(option: 'mode', value: $mode, allowed: 'immutable, overwrite, skip-existing'),
     };
 
     $dotenv = new Dotenv(projectDir($options), new DotenvConfiguration(loadMode: $loadMode));
@@ -526,5 +526,5 @@ function stderr(string $message): void
 
 function truncate(string $text, int $max): string
 {
-    return strlen($text) > $max ? substr($text, 0, $max - 3) . '...' : $text;
+    return strlen($text) > $max ? substr(string: $text, offset: 0, length: $max - 3) . '...' : $text;
 }

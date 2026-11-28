@@ -12,7 +12,20 @@ use KaririCode\Dotenv\Enum\ValueType;
  * Holds the raw string, detected type, cast PHP value, and source metadata.
  * Once constructed, no mutation is possible — ARFA 1.3 P1 compliant.
  *
- * @package KaririCode\Dotenv
+ * Preconditions: `$rawValue` is the decrypted string; `$value` is what
+ * casting and processors made of it.
+ *
+ * Thread-safety: immutable; safe to share between fibers and requests.
+ *
+ * Side effects: none.
+ *
+ * Example:
+ *
+ *     $variable = $dotenv->variables()['APP_DEBUG'];
+ *     $fromFile = $variable->source; // the path of the file that set it
+ *
+ * References: ADR-002, SPEC-001. ARFA 1.3 P1: an immutable value.
+ *
  * @since   4.0.0 ARFA 1.3
  */
 final readonly class EnvironmentVariable

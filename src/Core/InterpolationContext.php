@@ -18,9 +18,19 @@ namespace KaririCode\Dotenv\Core;
  * `$locked` exists for LoadMode::SkipExisting, where a pre-existing
  * environment value is the effective one even if the file redefines it.
  *
- * Spec V4.0 Value Object: final readonly, no behaviour beyond construction.
+ * Preconditions: `$valueFilter` turns a stored value into its plaintext and
+ * is called only for same-file references.
  *
- * @package KaririCode\Dotenv
+ * Thread-safety: immutable; safe to share between fibers and requests.
+ *
+ * Side effects: none.
+ *
+ * Example:
+ *
+ *     $parsed = new DotenvParser()->parse(content: $content, filePath: '.env.local', context: new InterpolationContext(inherited: $earlier));
+ *
+ * References: SPEC-002 §6, ADR-006. ARFA 1.3 P1: an immutable value.
+ *
  * @since   4.5.0
  */
 final readonly class InterpolationContext

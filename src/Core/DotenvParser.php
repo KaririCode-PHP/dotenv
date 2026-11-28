@@ -29,7 +29,19 @@ use KaririCode\Dotenv\Exception\ParseException;
  * ARFA 1.3 P1: The parser produces immutable string pairs — no mutation after parse.
  * ARFA 1.3 P4: Protocol-agnostic — works with any input stream providing raw .env content.
  *
- * @package KaririCode\Dotenv
+ * Preconditions: the content is UTF-8 text; references resolve through the
+ * given InterpolationContext and the lines parsed so far.
+ *
+ * Thread-safety: stateless; one instance serves every caller.
+ *
+ * Side effects: none.
+ *
+ * Example:
+ *
+ *     $variables = new DotenvParser()->parse("A=1\nB=\"${A}2\"", '.env'); // ['A' => '1', 'B' => '12']
+ *
+ * References: SPEC-002. ARFA 1.3 P4: any string content, no I/O.
+ *
  * @since   4.0.0 ARFA 1.3
  */
 final readonly class DotenvParser
@@ -65,9 +77,9 @@ final readonly class DotenvParser
             escapedDollar: $escapedDollar,
             expander: function (string $value) use (&$variables, $context, $escapedDollar): string {
                 /** @var array<string, string> $variables */
-                $expanded = $this->expandReferences($value, $variables, $context);
+                $expanded = $this->expandReferences(value: $value, variables: $variables, context: $context);
 
-                return str_replace($escapedDollar, '$', $expanded);
+                return str_replace(search: $escapedDollar, replace: '$', subject: $expanded);
             },
         );
 
@@ -98,17 +110,17 @@ final readonly class DotenvParser
                 $name = $trimmed;
                 $rawValue = '';
             } else {
-                $name = rtrim(substr($trimmed, 0, $equalsPos));
+                $name = rtrim(substr(string: $trimmed, offset: 0, length: $equalsPos));
                 $rawValue = ltrim(substr($trimmed, $equalsPos + 1));
             }
 
             $namePattern = $strictNames ? self::STRICT_NAME_PATTERN : self::VARIABLE_NAME_PATTERN;
 
             if (preg_match($namePattern, $name) !== 1) {
-                throw ParseException::invalidVariableName($name, $lineNumber, $filePath, $strictNames);
+                throw ParseException::invalidVariableName(name: $name, lineNumber: $lineNumber, filePath: $filePath, strict: $strictNames);
             }
 
-            [$parsedValue, $consumed] = $this->parseValue($rawValue, $lineNumber, $values);
+            [$parsedValue, $consumed] = $this->parseValue(rawValue: $rawValue, currentLine: $lineNumber, values: $values);
             $lineNumber += $consumed;
 
             $variables[$name] = $parsedValue;
@@ -133,11 +145,11 @@ final readonly class DotenvParser
         }
 
         if ($rawValue[0] === '"') {
-            return $this->parseDoubleQuoted($rawValue, $currentLine, $values);
+            return $this->parseDoubleQuoted(rawValue: $rawValue, currentLine: $currentLine, values: $values);
         }
 
         if ($rawValue[0] === "'") {
-            return $this->parseSingleQuoted($rawValue, $currentLine, $values->filePath);
+            return $this->parseSingleQuoted(rawValue: $rawValue, currentLine: $currentLine, filePath: $values->filePath);
         }
 
         return [$this->parseUnquoted($rawValue, $values), 0];
@@ -219,19 +231,19 @@ final readonly class DotenvParser
      */
     private function parseSingleQuoted(string $rawValue, int $currentLine, string $filePath): array
     {
-        $closingPos = strpos($rawValue, "'", 1);
+        $closingPos = strpos(haystack: $rawValue, needle: "'", offset: 1);
 
         if ($closingPos === false) {
             throw ParseException::unterminatedQuote($currentLine, $filePath);
         }
 
-        return [substr($rawValue, 1, $closingPos - 1), 0];
+        return [substr(string: $rawValue, offset: 1, length: $closingPos - 1), 0];
     }
 
     private function parseUnquoted(string $rawValue, ValueContext $values): string
     {
         // Strip inline comment: `#` preceded by whitespace
-        $value = preg_replace('/\s+#.*\z/', '', $rawValue) ?? $rawValue;
+        $value = preg_replace(pattern: '/\s+#.*\z/', replacement: '', subject: $rawValue) ?? $rawValue;
 
         return $values->expand(trim($value));
     }
@@ -251,14 +263,14 @@ final readonly class DotenvParser
         }
 
         return preg_replace_callback(
-            self::REFERENCE_PATTERN,
+            pattern: self::REFERENCE_PATTERN,
             /** @param array<array-key, string|null> $matches unmatched groups are null (PREG_UNMATCHED_AS_NULL) */
-            function (array $matches) use ($variables, $context): string {
+            callback: function (array $matches) use ($variables, $context): string {
                 if ($matches['bare'] !== null) {
-                    return $this->resolveReference($matches['bare'], $variables, $context) ?? '';
+                    return $this->resolveReference(name: $matches['bare'], variables: $variables, context: $context) ?? '';
                 }
 
-                $resolved = $this->resolveReference((string) $matches['name'], $variables, $context);
+                $resolved = $this->resolveReference(name: (string) $matches['name'], variables: $variables, context: $context);
                 $isSet = $resolved !== null && $resolved !== '';
                 $operand = (string) $matches['operand'];
 
@@ -268,10 +280,10 @@ final readonly class DotenvParser
                     default => $resolved ?? '',
                 };
             },
-            $value,
-            -1,
-            $count,
-            PREG_UNMATCHED_AS_NULL,
+            subject: $value,
+            limit: -1,
+            count: $count,
+            flags: PREG_UNMATCHED_AS_NULL,
         ) ?? $value;
     }
 
@@ -324,6 +336,6 @@ final readonly class DotenvParser
      */
     private function normalizeLines(string $content): array
     {
-        return explode("\n", str_replace(["\r\n", "\r"], "\n", $content));
+        return explode("\n", str_replace(search: ["\r\n", "\r"], replace: "\n", subject: $content));
     }
 }

@@ -13,6 +13,9 @@ use KaririCode\Contract\Exception\Runtime;
 use KaririCode\Contract\Exception\Validation;
 use KaririCode\Dotenv\Exception\DotenvException;
 use KaririCode\Dotenv\Exception\EnvCode;
+use PhpParser\Node;
+use PhpParser\NodeFinder;
+use PhpParser\ParserFactory;
 use PhpToken;
 use PHPUnit\Framework\Attributes\CoversNothing;
 use PHPUnit\Framework\Attributes\Test;
@@ -51,6 +54,11 @@ final class ArfaConformanceTest extends TestCase
         'ValidationException',
     ];
 
+    private const int MARKER_WIDTH = 72;
+
+    /** Comment criteria C2–C5 of Spec V4.3.3 §17; C1 is the summary sentence that opens the docblock. */
+    private const array COMMENT_MARKERS = ['Preconditions:', 'Thread-safety:', 'Side effects:', 'Example', 'References:'];
+
     /** The eight gates of Spec V4.3.3 §29.1. */
     private const array QUALITY_GATES = ['test', 'test-conformance', 'phpstan', 'psalm', 'cs-check', 'complexity', 'mutation', 'security'];
 
@@ -79,6 +87,38 @@ final class ArfaConformanceTest extends TestCase
         self::assertSame(1, preg_match_all('/^function \w+\(/m', $code));
         self::assertTrue(function_exists('KaririCode\\Dotenv\\env'));
         self::assertSame(0, preg_match('/^\s*static \$/m', $code), 'static variable');
+    }
+
+    #[Test]
+    public function docblocksMeetTheFiveCommentCriteria(): void
+    {
+        foreach (self::sourceFiles() as $relative => $code) {
+            $doc = (string) self::reflect($relative)->getDocComment();
+            $summary = trim((string) preg_replace('#^/\*\*\s*\*\s*#', '', $doc));
+
+            self::assertNotSame('', $doc, $relative . ': C1 role');
+            self::assertDoesNotMatchRegularExpression('/^(Represents|This (class|interface|enum)|Class|Interface)\b/', $summary, $relative . ': C1 states a role, not a restatement');
+
+            foreach (self::COMMENT_MARKERS as $marker) {
+                self::assertStringContainsString($marker, $doc, $relative);
+            }
+
+            self::assertDoesNotMatchRegularExpression('/@(package|author|license)\b/', $code, $relative);
+        }
+    }
+
+    #[Test]
+    public function sectionMarkersAreSeventyTwoColumnsWide(): void
+    {
+        $files = [...self::sourceFiles(), ...self::phpFiles(self::ROOT . '/tests'), 'bin/kariricode-dotenv' => self::document('bin/kariricode-dotenv')];
+
+        foreach ($files as $relative => $code) {
+            foreach (explode("\n", $code) as $number => $line) {
+                if (str_starts_with(ltrim($line), '// ─')) {
+                    self::assertSame(self::MARKER_WIDTH, mb_strlen(ltrim($line)), sprintf('%s:%d', $relative, $number + 1));
+                }
+            }
+        }
     }
 
     // ── Types ────────────────────────────────────────────────────────────
@@ -223,6 +263,37 @@ final class ArfaConformanceTest extends TestCase
         }
 
         self::assertGreaterThan(0, $patterns);
+    }
+
+    #[Test]
+    public function callSitesWithThreeOrMoreArgumentsNameThem(): void
+    {
+        $parser = (new ParserFactory())->createForNewestSupportedVersion();
+        $finder = new NodeFinder();
+        $offenders = [];
+        $checked = 0;
+        $files = [...self::sourceFiles(), self::FUNCTIONS_FILE => self::document('src/' . self::FUNCTIONS_FILE), 'bin/kariricode-dotenv' => self::document('bin/kariricode-dotenv')];
+
+        foreach ($files as $relative => $code) {
+            foreach ($finder->findInstanceOf($parser->parse($code) ?? [], Node\Expr\CallLike::class) as $call) {
+                if ($call->isFirstClassCallable() || count($call->getArgs()) < 3 || self::isVariadicFormatting($call)) {
+                    continue;
+                }
+
+                ++$checked;
+
+                foreach ($call->getArgs() as $argument) {
+                    if ($argument->name === null && !$argument->unpack) {
+                        $offenders[] = sprintf('%s:%d', $relative, $call->getStartLine());
+
+                        break;
+                    }
+                }
+            }
+        }
+
+        self::assertGreaterThan(0, $checked);
+        self::assertSame([], $offenders, 'Spec V4.3.3 §30: name the arguments of every call with three or more.');
     }
 
     #[Test]
@@ -401,6 +472,14 @@ final class ArfaConformanceTest extends TestCase
     }
 
     // ── Helpers ──────────────────────────────────────────────────────────
+
+    /** printf-family values are variadic and have no names. */
+    private static function isVariadicFormatting(Node\Expr\CallLike $call): bool
+    {
+        return $call instanceof Node\Expr\FuncCall
+            && $call->name instanceof Node\Name
+            && in_array(needle: $call->name->toLowerString(), haystack: ['sprintf', 'printf', 'vsprintf'], strict: true);
+    }
 
     /** @return list<string> */
     private static function glob(string $pattern): array

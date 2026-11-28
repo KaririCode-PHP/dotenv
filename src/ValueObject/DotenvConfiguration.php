@@ -14,7 +14,19 @@ use KaririCode\Dotenv\Enum\LoadMode;
  *
  * ARFA 1.3 P1: Immutable — all mutations return new instances.
  *
- * @package KaririCode\Dotenv
+ * Preconditions: an encryption key, when given, is 32 raw bytes or 64 hex
+ * characters; Dotenv checks it when built.
+ *
+ * Thread-safety: immutable; safe to share between fibers and requests.
+ *
+ * Side effects: none.
+ *
+ * Example:
+ *
+ *     $config = new DotenvConfiguration(loadMode: LoadMode::Overwrite)->withCachePath(__DIR__ . '/.env.cache.php');
+ *
+ * References: ADR-002, SPEC-001. ARFA 1.3 P1: every change is a new instance.
+ *
  * @since   4.0.0 ARFA 1.3
  */
 final readonly class DotenvConfiguration

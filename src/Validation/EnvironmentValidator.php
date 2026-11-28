@@ -34,7 +34,25 @@ use KaririCode\Dotenv\Validation\Rule\UrlRule;
  *     ->assert();
  * ```
  *
- * @package KaririCode\Dotenv
+ * Preconditions: the value resolver returns the raw string of a variable,
+ * or null when it is not defined.
+ *
+ * Thread-safety: one instance per validation; the fluent methods change its
+ * rule list.
+ *
+ * Side effects: assert() throws; the resolver may read the process
+ * environment.
+ *
+ * Example:
+ *
+ *     $dotenv->validate()
+ *         ->required('DB_HOST', 'DB_PORT')
+ *         ->isInteger('DB_PORT')->between(1, 65535)
+ *         ->assert();
+ *
+ * References: ADR-008, SPEC-005. ARFA 1.3 P5: every failure reported in one
+ * pass.
+ *
  * @since   4.1.0
  */
 final class EnvironmentValidator
@@ -187,7 +205,7 @@ final class EnvironmentValidator
 
             foreach ($ruleList as $rule) {
                 if (!$rule->passes($value)) {
-                    $errors[] = str_replace('{name}', $name, $rule->message());
+                    $errors[] = str_replace(search: '{name}', replace: $name, subject: $rule->message());
                 }
             }
         }

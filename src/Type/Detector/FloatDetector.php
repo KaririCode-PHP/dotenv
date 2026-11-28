@@ -10,7 +10,18 @@ use KaririCode\Dotenv\Enum\ValueType;
 /**
  * Detects float values: digits with decimal point and optional exponent.
  *
- * @package KaririCode\Dotenv
+ * Preconditions: none; any string may be passed.
+ *
+ * Thread-safety: stateless; one instance serves every caller.
+ *
+ * Side effects: none.
+ *
+ * Example:
+ *
+ *     new FloatDetector()->detect('3.14'); // ValueType::Float
+ *
+ * References: ADR-003, SPEC-003. ARFA 1.3 P1: pure detection.
+ *
  * @since   4.0.0 ARFA 1.3
  */
 final readonly class FloatDetector implements TypeDetector

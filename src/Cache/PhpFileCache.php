@@ -17,7 +17,24 @@ use KaririCode\Dotenv\Exception\CacheException;
  *
  * Standalone — no framework or external cache server required.
  *
- * @package KaririCode\Dotenv
+ * Preconditions: the cache directory exists and is writable for dump(); the
+ * file is written only by dump(), never by hand.
+ *
+ * Thread-safety: stateless; one instance serves every caller.
+ *
+ * Side effects: dump() writes a temporary file, renames it over the cache
+ * and invalidates the OPcache entry; clear() deletes the file; load()
+ * includes the file; computeSourceHash() stats the sources.
+ *
+ * Example:
+ *
+ *     $cache = new PhpFileCache();
+ *     $cache->dump($path, $snapshot);
+ *     $snapshot = $cache->load($path); // null when a source changed since
+ *
+ * References: ADR-005, SPEC-001. ARFA 1.3 P5: the source fingerprint is
+ * observable.
+ *
  * @since   4.2.0
  */
 final readonly class PhpFileCache
@@ -139,7 +156,7 @@ final readonly class PhpFileCache
             return null;
         }
 
-        return $this->describe($meta, $sources, $map);
+        return $this->describe(meta: $meta, sources: $sources, variables: $map);
     }
 
     /**

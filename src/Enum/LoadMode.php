@@ -13,7 +13,18 @@ namespace KaririCode\Dotenv\Enum;
  *
  * ARFA 1.3 P1: Immutable State Transformation — once loaded, values are sealed.
  *
- * @package KaririCode\Dotenv
+ * Preconditions: none.
+ *
+ * Thread-safety: an enum; immutable.
+ *
+ * Side effects: none.
+ *
+ * Example:
+ *
+ *     $dotenv = new Dotenv(__DIR__, new DotenvConfiguration(loadMode: LoadMode::SkipExisting));
+ *
+ * References: ADR-006. ARFA 1.3 P1 and E-003: a pure enum.
+ *
  * @since   4.0.0 ARFA 1.3
  */
 enum LoadMode

@@ -12,9 +12,19 @@ use KaririCode\Dotenv\Exception\ConfigurationException;
  * The public ID is the first 8 hex characters of SHA-256(raw key). It lets
  * several environments reference their keys without exposing key material.
  *
- * Spec V4.0 Value Object: final readonly, created only via named constructors.
+ * Preconditions: fromPrivateKey() takes 64 hex characters.
  *
- * @package KaririCode\Dotenv
+ * Thread-safety: immutable; safe to share between fibers and requests.
+ *
+ * Side effects: generate() reads the CSPRNG.
+ *
+ * Example:
+ *
+ *     $pair = KeyPair::generate();
+ *     echo "DOTENV_PRIVATE_KEY={$pair->privateKey}  # id {$pair->publicId}\n";
+ *
+ * References: ADR-004, SPEC-004. ASVS 5.0 V11 (key management).
+ *
  * @since   4.3.0
  */
 final readonly class KeyPair
@@ -45,6 +55,6 @@ final readonly class KeyPair
 
     private static function deriveId(string $rawKey): string
     {
-        return substr(hash('sha256', $rawKey), 0, 8);
+        return substr(string: hash('sha256', $rawKey), offset: 0, length: 8);
     }
 }

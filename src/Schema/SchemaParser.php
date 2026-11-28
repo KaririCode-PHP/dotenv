@@ -42,7 +42,21 @@ use KaririCode\Dotenv\Validation\EnvironmentValidator;
  * - `regex = /pattern/`
  * - `default = value` (informational — actual default injection is out of scope)
  *
- * @package KaririCode\Dotenv
+ * Preconditions: the schema is INI-like text with one section per variable;
+ * unknown directives are ignored, unknown types are rejected when applied.
+ *
+ * Thread-safety: stateless; one instance serves every caller.
+ *
+ * Side effects: applyToValidator() adds rules to the validator it receives.
+ *
+ * Example:
+ *
+ *     $parser = new SchemaParser();
+ *     $parser->applyToValidator($parser->parse((string) file_get_contents('.env.schema')), $dotenv->validate());
+ *
+ * References: SPEC-006, ADR-008. ARFA 1.3 P5: every rule reported in one
+ * pass.
+ *
  * @since   4.4.0
  */
 final readonly class SchemaParser
@@ -66,7 +80,7 @@ final readonly class SchemaParser
             }
 
             // Section header: [VAR_NAME]
-            if (preg_match('/^\[([A-Za-z_][A-Za-z0-9_]*)\]\z/', $line, $matches) === 1) {
+            if (preg_match(pattern: '/^\[([A-Za-z_][A-Za-z0-9_]*)\]\z/', subject: $line, matches: $matches) === 1) {
                 $currentSection = $matches[1];
                 $schema[$currentSection] ??= [];
                 continue;
@@ -76,7 +90,7 @@ final readonly class SchemaParser
             $eqPos = strpos($line, '=');
 
             if ($currentSection !== null && $eqPos !== false) {
-                $key = trim(substr($line, 0, $eqPos));
+                $key = trim(substr(string: $line, offset: 0, length: $eqPos));
                 $value = trim(substr($line, $eqPos + 1));
                 $schema[$currentSection][$key] = $value;
             }
@@ -95,7 +109,7 @@ final readonly class SchemaParser
         EnvironmentValidator $validator,
     ): void {
         foreach ($schema as $variableName => $directives) {
-            $this->applyVariable($variableName, $directives, $validator);
+            $this->applyVariable(name: $variableName, directives: $directives, validator: $validator);
         }
     }
 
@@ -116,7 +130,7 @@ final readonly class SchemaParser
             $validator->notEmpty($name);
         }
 
-        $this->applyType($name, $directives['type'] ?? 'string', $validator);
+        $this->applyType(name: $name, type: $directives['type'] ?? 'string', validator: $validator);
 
         if (isset($directives['min'], $directives['max'])) {
             $validator->between((float) $directives['min'], (float) $directives['max']);
@@ -154,6 +168,6 @@ final readonly class SchemaParser
     {
         $value = $directives[$key] ?? 'false';
 
-        return in_array(strtolower($value), ['true', '1', 'yes', 'on'], true);
+        return in_array(needle: strtolower($value), haystack: ['true', '1', 'yes', 'on'], strict: true);
     }
 }

@@ -30,9 +30,21 @@ use KaririCode\Dotenv\Type\Detector\NullDetector;
  * Both detectors and casters can be replaced or extended at runtime via
  * addDetector() and addCaster(), supporting the Open/Closed Principle.
  *
- * Spec V4.0 Entity: final, internal detector list sorted lazily on first use.
+ * Preconditions: register detectors and casters before the first detect();
+ * a detector's type needs a caster, or its values stay strings.
  *
- * @package KaririCode\Dotenv
+ * Thread-safety: not for concurrent registration; detection and casting
+ * read the registered lists only.
+ *
+ * Side effects: addDetector() and addCaster() change this instance.
+ *
+ * Example:
+ *
+ *     $types = new TypeSystem();
+ *     $value = $types->resolve('true'); // true
+ *
+ * References: ADR-003, SPEC-003. ARFA 1.3 P1: values typed, sources kept.
+ *
  * @since   4.0.0 ARFA 1.3
  */
 final class TypeSystem

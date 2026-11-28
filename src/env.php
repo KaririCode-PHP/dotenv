@@ -12,7 +12,9 @@ use KaririCode\Dotenv\Type\TypeSystem;
  * Resolution order: $_ENV → $_SERVER → getenv() → $default.
  *
  * The value is cast through the default TypeSystem pipeline,
- * so "true" → bool, "42" → int, "{...}" → array, etc.
+ * so "true" → bool, "42" → int, "{...}" → array, etc. Each call builds
+ * its own TypeSystem, so no state outlives it (ADR-009); code that reads
+ * many values should use Dotenv::get().
  *
  * @param non-empty-string $key Variable name.
  * @param mixed $default Fallback when the variable is not defined.
