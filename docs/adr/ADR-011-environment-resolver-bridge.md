@@ -29,6 +29,11 @@ its first consumer.
 
 - kariricode/contract 2.9: `Environment\EnvironmentResolver` (`get()`,
   `has()`; one snapshot; `has()` true exactly when `get()` is not null).
+- The configurator 4.2 integration draft, never released: a
+  `Bridge\DotenvEnvironmentResolver` over an array of loaded values, with
+  an optional fallback to the process environment through a
+  `SystemFallbackResolver`, built by `fromLoaded()` from any object with
+  an `all()` method.
 - kariricode/event-dispatcher ADR-011 and kariricode/parser's
   `Integration` namespace: a component ships the bridges from its own
   types to the contract, and the consumer depends on the contract only.
@@ -74,7 +79,8 @@ its first consumer.
 |---|---|
 | The bridge in kariricode/configurator | the configurator would depend on this package for one class, and every other consumer of the contract would repeat it |
 | Return the typed value | the contract returns `?string`; types are the caller's choice, as `Dotenv::get()` gives them |
-| Fall back to `$_ENV`, `$_SERVER` and `getenv()` | the answer would depend on process settings this package does not control, and the store could no longer be told apart from the process |
+| Fall back to `$_ENV`, `$_SERVER` and `getenv()`, as the configurator 4.2 integration draft's `fromLoaded(systemFallback: true)` did | the answer would depend on process settings this package does not control, the store could no longer be told apart from the process, and kariricode/configurator already composes resolvers (`CompositeEnvironmentResolver`, `SystemEnvironmentResolver`) |
+| Build from any object with an `all()` method, as that draft did | duck typing the contract exists to replace; 4.5.0 exposes `variables()`, and the bridge takes the `Dotenv` type |
 | Copy the store when built | a resolver built before boot would stay empty for good |
 
 ## References

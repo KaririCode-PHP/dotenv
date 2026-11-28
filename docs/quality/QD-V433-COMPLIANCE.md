@@ -1,21 +1,25 @@
 # QD-V433-COMPLIANCE: kariricode/dotenv 4.5.0
 
-- **Status: PENDING** (automated gates)
+- **Status: PASS** (automated gates)
 - **Date:** 2026-11-28
 - **Component:** kariricode/dotenv 4.5.0; kariricode/contract ^2.11 (2.12.1 locked); kariricode/exception ^2.0.2 (2.0.2 locked)
 - **Standards:** KaririCode Spec V4.3.3 §29 (gates) and §32 (supply chain); ARFA 1.3 level 1 (Structural); OWASP ASVS 5.0 level 2
 - **Authors:** Walmir Silva <walmir.silva@kariricode.org>
 
-Every automated gate of §29.1 passes locally (§1). The status turns PASS
-when CI reports the same at the commit this record describes, and FAIL if
-a gate fails. PASS covers the automated gates (G1, G4, G5, G6); G3 needs a
-second reviewer (§8). No score is assigned (E-006). This is the first
+Every automated gate of §29.1 passes, locally (§1) and in CI: run
+[46125878518](https://github.com/KaririCode-PHP/dotenv/actions/runs/46125878518)
+passed the gates on PHP 8.4.28 and the suites on PHP 8.5.13 with the lowest
+dependencies (kariricode/contract 2.11.0, kariricode/exception 2.0.2), at
+`677a19e`. The status turns FAIL if a gate fails. PASS covers the automated
+gates (G1, G4, G5, G6); G3 needs a second reviewer (§8). No score is assigned (E-006). This is the first
 quality record of the package; the review of 2026-09-29 measured PHPUnit,
 PHPStan level 9 and PHP-CS-Fixer only (`docs/CODE-REVIEW.md`).
 
 ## 1. Gates (Spec V4.3.3 §29.1)
 
-Measured locally on 2026-11-28 (§2).
+Measured locally on 2026-11-28 (§2). CI reported the same tests (412,
+4,365 assertions) and the same mutants (1,049: 984 killed, 11 timed out,
+3 syntax errors, 51 escaped).
 
 | Gate | Command | Budget | Measured | Result |
 |---|---|---|---|---|
