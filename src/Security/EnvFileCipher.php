@@ -150,7 +150,7 @@ final readonly class EnvFileCipher
         }
 
         if ($rawValue[0] !== '"') {
-            $unquoted = preg_replace(pattern: '/\s+#.*\z/s', replacement: '', subject: $rawValue) ?? $rawValue;
+            $unquoted = preg_replace(pattern: '/\s+#.*\z/', replacement: '', subject: $rawValue) ?? $rawValue;
 
             return preg_match('/\$(\{[A-Za-z_]|[A-Za-z_])/', $unquoted) === 1;
         }
@@ -189,10 +189,11 @@ final readonly class EnvFileCipher
             $close = $first === '"' ? $this->closingDoubleQuote($rawValue) : strpos(haystack: $rawValue, needle: "'", offset: 1);
             $rest = $close === false ? '' : substr($rawValue, $close + 1);
 
-            return preg_match(pattern: '/\A(\s+#.*)\z/s', subject: $rest, matches: $matches) === 1 ? $matches[1] : '';
+            return preg_match(pattern: '/\A\s+#.*\z/', subject: $rest, matches: $matches) === 1 ? $matches[0] : '';
         }
 
-        return preg_match(pattern: '/(\s+#.*)\z/s', subject: $rawValue, matches: $matches) === 1 ? $matches[1] : '';
+        // An unquoted value is one line: the comment runs to its end.
+        return preg_match(pattern: '/\s+#.*\z/', subject: $rawValue, matches: $matches) === 1 ? $matches[0] : '';
     }
 
     private function closingDoubleQuote(string $rawValue): int|false

@@ -117,7 +117,6 @@ final class TypeSystem
             new JsonDetector(),
             new ArrayDetector(),
         ];
-        $this->sorted = false;
 
         $this->casters = [
             ValueType::Null->name => new NullCaster(),

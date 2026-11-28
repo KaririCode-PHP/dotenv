@@ -12,10 +12,8 @@ use KaririCode\Dotenv\Processor\CsvToArrayProcessor;
 use KaririCode\Dotenv\Security\Encryptor;
 use KaririCode\Dotenv\Security\KeyPair;
 use KaririCode\Dotenv\ValueObject\DotenvConfiguration;
-use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\Attributes\Test;
 
-#[CoversClass(DotenvEnvironmentResolver::class)]
 final class EnvironmentResolverTest extends IntegrationTestCase
 {
     #[Test]

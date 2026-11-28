@@ -35,7 +35,8 @@ final readonly class ArrayCaster implements TypeCaster
     #[\Override]
     public function cast(string $value): array
     {
-        $decoded = json_decode(json: trim($value), associative: true, depth: 512, flags: JSON_THROW_ON_ERROR);
+        // JSON allows whitespace around a value, so the raw string is decoded as it is.
+        $decoded = json_decode(json: $value, associative: true, flags: JSON_THROW_ON_ERROR);
 
         if (!is_array($decoded) || !array_is_list($decoded)) {
             throw ConversionException::jsonStructureExpected('JSON array');

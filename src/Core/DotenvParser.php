@@ -243,9 +243,9 @@ final readonly class DotenvParser
     private function parseUnquoted(string $rawValue, ValueContext $values): string
     {
         // Strip inline comment: `#` preceded by whitespace
-        $value = preg_replace(pattern: '/\s+#.*\z/', replacement: '', subject: $rawValue) ?? $rawValue;
-
-        return $values->expand(trim($value));
+        // The line is trimmed and the pattern takes the whitespace before
+        // the `#`, so nothing is left to trim.
+        return $values->expand(preg_replace(pattern: '/\s+#.*\z/', replacement: '', subject: $rawValue) ?? $rawValue);
     }
 
     // ── Variable Expansion ───────────────────────────────────────────────
@@ -281,8 +281,6 @@ final readonly class DotenvParser
                 };
             },
             subject: $value,
-            limit: -1,
-            count: $count,
             flags: PREG_UNMATCHED_AS_NULL,
         ) ?? $value;
     }

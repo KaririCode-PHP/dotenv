@@ -43,11 +43,9 @@ final readonly class EnvFileScanner
 
         for ($index = 0; $index < $lineCount; ++$index) {
             $line = $lines[$index];
-            $trimmed = trim($line);
 
-            if ($trimmed === '' || str_starts_with($trimmed, '#')
-                || preg_match(pattern: self::ASSIGNMENT_PATTERN, subject: $line, matches: $matches) !== 1
-            ) {
+            // Blank lines and comments never match: a name starts with a letter or `_`.
+            if (preg_match(pattern: self::ASSIGNMENT_PATTERN, subject: $line, matches: $matches) !== 1) {
                 $entries[] = new EnvEntry($line);
 
                 continue;
@@ -102,7 +100,8 @@ final readonly class EnvFileScanner
         $length = strlen($fragment);
 
         for ($i = 0; $i < $length; ++$i) {
-            if ($fragment[$i] === '\\' && $i + 1 < $length) {
+            // A backslash escapes the next character; one at the end escapes nothing.
+            if ($fragment[$i] === '\\') {
                 ++$i;
 
                 continue;

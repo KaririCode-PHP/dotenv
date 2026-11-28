@@ -674,10 +674,6 @@ final class Dotenv
 
     private function matchGlob(string $pattern, string $name): bool
     {
-        if ($pattern === $name) {
-            return true;
-        }
-
         $regex = '/\A' . str_replace(search: ['\*', '\?'], replace: ['.*', '.'], subject: preg_quote($pattern, '/')) . '\z/';
 
         return preg_match($regex, $name) === 1;
