@@ -6,6 +6,7 @@ namespace KaririCode\Dotenv\Tests\Unit\Cache;
 
 use KaririCode\Dotenv\Cache\CacheSnapshot;
 use KaririCode\Dotenv\Cache\PhpFileCache;
+use KaririCode\Dotenv\Exception\CacheException;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\Attributes\Test;
 use PHPUnit\Framework\TestCase;
@@ -132,6 +133,21 @@ final class PhpFileCacheMetadataTest extends TestCase
 
             self::assertNull($this->cache->load($path), (string) array_keys($documents)[$index]);
         }
+    }
+
+    #[Test]
+    public function aCacheThatCannotBeWrittenIsReported(): void
+    {
+        $this->expectException(CacheException::class);
+        $this->expectExceptionMessage('[ENV_2760]');
+
+        $this->cache->dump($this->directory . '/missing/.env.cache.php', new CacheSnapshot(
+            strategy: CacheSnapshot::STRATEGY_LOAD,
+            environment: null,
+            requestedEnvironment: null,
+            sources: [],
+            variables: [],
+        ));
     }
 
     #[Test]

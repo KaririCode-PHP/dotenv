@@ -70,11 +70,11 @@ final readonly class PhpFileCache
 
         $tmpFile = $path . '.tmp.' . bin2hex(random_bytes(6));
 
-        if (file_put_contents($tmpFile, $content) === false) {
+        if (!$this->quietly(static fn(): bool => file_put_contents($tmpFile, $content) !== false)) {
             throw CacheException::writeFailed($path);
         }
 
-        if (!rename($tmpFile, $path)) {
+        if (!$this->quietly(static fn(): bool => rename($tmpFile, $path))) {
             if (is_file($tmpFile)) {
                 unlink($tmpFile);
             }
@@ -185,6 +185,23 @@ final readonly class PhpFileCache
             variables: $variables,
             encrypted: $encrypted,
         );
+    }
+
+    /**
+     * Runs a filesystem call with PHP's warnings silenced, so its failure
+     * reaches the caller as a CacheException and never as a warning.
+     *
+     * @param \Closure(): bool $operation
+     */
+    private function quietly(\Closure $operation): bool
+    {
+        set_error_handler(static fn(): bool => true);
+
+        try {
+            return $operation();
+        } finally {
+            restore_error_handler();
+        }
     }
 
     /** @param list<string> $sources */
