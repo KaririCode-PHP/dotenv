@@ -14,8 +14,8 @@ use KaririCode\Dotenv\Type\TypeSystem;
  * The value is cast through the default TypeSystem pipeline,
  * so "true" → bool, "42" → int, "{...}" → array, etc.
  *
- * @param non-empty-string $key     Variable name.
- * @param mixed            $default Fallback when the variable is not defined.
+ * @param non-empty-string $key Variable name.
+ * @param mixed $default Fallback when the variable is not defined.
  *
  * @return mixed Typed value, or $default if not found.
  */
@@ -32,7 +32,7 @@ function env(string $key, mixed $default = null): mixed
         return $default;
     }
 
-    if (! \is_string($value)) {
+    if (!is_string($value)) {
         return $value;
     }
 

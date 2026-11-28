@@ -1,8 +1,12 @@
-# SPEC-005: Schema Format (.env.schema)
+# SPEC-006: Schema Format (.env.schema)
 
-**Version:** 1.0
-**Date:** 2024-03-01
-**Applies to:** KaririCode\Dotenv 4.4+
+| Field | Value |
+|---|---|
+| **Version** | 4.5.0 |
+| **Introduced** | 4.4.0 |
+| **ARFA 1.3** | P4 (Protocol Agnosticism) |
+| **Errata** | E-011 |
+| **Date** | 2026-02-28 · revised 2026-09-29 (4.5.0) |
 
 ## 1. Overview
 
@@ -131,7 +135,7 @@ Produces: `AllowedValuesRule(['local', 'staging', 'production'])`.
 regex = /^[a-f0-9]{32}$/
 ```
 
-Produces: `MatchesRegexRule('/^[a-f0-9]{32}$/')`.
+Produces: `MatchesRegexRule('/^[a-f0-9]{32}$/')`. An invalid pattern (e.g. `/[a-/`) aborts `loadWithSchema()` with `ConfigurationException` — a schema error, not a validation failure of the value.
 
 ### 3.7 `default`
 
@@ -148,7 +152,7 @@ default = 5432
 
 For each variable section, directives are applied in this order:
 
-1. **required / optional** — Register as required or conditional (`ifPresent`).
+1. **required / optional** — `required()` when `required = true`, otherwise `ifPresent()` (rules then run only if the variable is set).
 2. **notEmpty** — Add `NotEmptyRule` if `true`.
 3. **type** — Add the corresponding type rule.
 4. **min + max** — Add `BetweenRule` if both are present.

@@ -1,8 +1,12 @@
 # ADR-004: AES-256-GCM Encryption Format
 
-**Status:** Accepted
-**Date:** 2024-02-10
-**Applies to:** KaririCode\Dotenv 4.3+
+| Field | Value |
+|---|---|
+| **Status** | Accepted |
+| **Introduced** | 4.3.0 |
+| **ARFA 1.3** | P1 (Immutable State) |
+| **Errata** | E-011 |
+| **Date** | 2026-02-28 · revised 2026-09-29 (4.5.0) |
 
 ## Context
 

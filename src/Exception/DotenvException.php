@@ -5,11 +5,14 @@ declare(strict_types=1);
 namespace KaririCode\Dotenv\Exception;
 
 /**
- * Base exception for all Dotenv-related errors.
+ * Root of every exception thrown by KaririCode\Dotenv.
+ *
+ * Abstract (Spec V4.0 E-006): only the semantic subclasses are thrown,
+ * so a single `catch (DotenvException $e)` covers the whole library.
  *
  * @package KaririCode\Dotenv
  * @since   4.0.0 ARFA 1.3
  */
-class DotenvException extends \RuntimeException
+abstract class DotenvException extends \RuntimeException
 {
 }

@@ -20,17 +20,17 @@ use KaririCode\Dotenv\Enum\LoadMode;
 final readonly class DotenvConfiguration
 {
     /**
-     * @param LoadMode      $loadMode        How to handle pre-existing variables.
-     * @param bool          $strictNames     Enforce [A-Z][A-Z0-9_]* naming convention.
-     * @param bool          $typeCasting     Enable automatic type detection and casting.
-     * @param bool          $populateEnv     Write to $_ENV superglobal.
-     * @param bool          $populateServer  Write to $_SERVER superglobal.
-     * @param bool          $usePutenv       Call putenv() — disabled by default for thread safety.
-     * @param string|null   $encryptionKey   Hex-encoded 256-bit key for encrypted values.
-     * @param string|null   $cachePath       Path to .env.cache.php for OPcache optimization.
-     * @param list<string>  $allowList       Glob patterns for allowed variable names (empty = all).
-     * @param list<string>  $denyList        Glob patterns for denied variable names.
-     * @param string|null   $environmentName Environment name for cascade loading (e.g., "production").
+     * @param LoadMode $loadMode How to handle pre-existing variables.
+     * @param bool $strictNames Enforce [A-Z][A-Z0-9_]* naming convention.
+     * @param bool $typeCasting Enable automatic type detection and casting.
+     * @param bool $populateEnv Write to $_ENV superglobal.
+     * @param bool $populateServer Write to $_SERVER superglobal.
+     * @param bool $usePutenv Call putenv() — disabled by default for thread safety.
+     * @param string|null $encryptionKey Hex-encoded 256-bit key for encrypted values.
+     * @param string|null $cachePath Path to .env.cache.php for OPcache optimization.
+     * @param list<string> $allowList Glob patterns for allowed variable names (empty = all).
+     * @param list<string> $denyList Glob patterns for denied variable names.
+     * @param string|null $environmentName Environment name for cascade loading (e.g., "production").
      */
     public function __construct(
         public LoadMode $loadMode = LoadMode::Immutable,
@@ -128,52 +128,6 @@ final readonly class DotenvConfiguration
             cachePath: $path,
             allowList: $this->allowList,
             denyList: $this->denyList,
-            environmentName: $this->environmentName,
-        );
-    }
-
-    /**
-     * Return a new instance with the given allow-list glob patterns.
-     *
-     * @param  list<string> $patterns  Glob patterns for allowed variable names.
-     * @since  4.0.0
-     */
-    public function withAllowList(array $patterns): self
-    {
-        return new self(
-            loadMode: $this->loadMode,
-            strictNames: $this->strictNames,
-            typeCasting: $this->typeCasting,
-            populateEnv: $this->populateEnv,
-            populateServer: $this->populateServer,
-            usePutenv: $this->usePutenv,
-            encryptionKey: $this->encryptionKey,
-            cachePath: $this->cachePath,
-            allowList: $patterns,
-            denyList: $this->denyList,
-            environmentName: $this->environmentName,
-        );
-    }
-
-    /**
-     * Return a new instance with the given deny-list glob patterns.
-     *
-     * @param  list<string> $patterns  Glob patterns for denied variable names.
-     * @since  4.0.0
-     */
-    public function withDenyList(array $patterns): self
-    {
-        return new self(
-            loadMode: $this->loadMode,
-            strictNames: $this->strictNames,
-            typeCasting: $this->typeCasting,
-            populateEnv: $this->populateEnv,
-            populateServer: $this->populateServer,
-            usePutenv: $this->usePutenv,
-            encryptionKey: $this->encryptionKey,
-            cachePath: $this->cachePath,
-            allowList: $this->allowList,
-            denyList: $patterns,
             environmentName: $this->environmentName,
         );
     }

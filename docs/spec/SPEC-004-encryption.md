@@ -1,8 +1,12 @@
-# SPEC-003: Encryption
+# SPEC-004: Encryption
 
-**Version:** 1.0
-**Date:** 2024-02-10
-**Applies to:** KaririCode\Dotenv 4.3+
+| Field | Value |
+|---|---|
+| **Version** | 4.5.0 |
+| **Introduced** | 4.3.0 |
+| **ARFA 1.3** | P1 (Immutable State), P5 (Observability) |
+| **Errata** | E-011 |
+| **Date** | 2026-02-28 · revised 2026-09-29 (4.5.0) |
 
 ## 1. Overview
 
@@ -128,24 +132,25 @@ Output:  plaintext string
    - IV: nonce
    - Options: OPENSSL_RAW_DATA
    - Tag: 16-byte tag
-6. If openssl_decrypt returns false → throw RuntimeException
+6. If openssl_decrypt returns false → throw `EncryptionException::decryptionFailed()`
 7. Return plaintext
 ```
 
 ## 7. Integration with Load Pipeline
 
-Decryption occurs inside `Dotenv::setVariable()`, after allow/deny filtering and before type detection:
+Decryption happens in `Dotenv::setVariable()` after filtering and the load-mode check, before type detection:
 
 ```
-Raw value from parser
-  → Allow/deny check
-  → Encryption detection (str_starts_with 'encrypted:')
-    → Yes: decrypt → decrypted string
-    → No: passthrough
-  → Type detection → Type casting → Processor application → Store
+Value from the parser (or cache)
+  → allow/deny check
+  → load-mode check (ADR-006)
+  → starts with "encrypted:"?  yes + key → decrypt   (no key → kept as the literal string)
+  → type detection → casting → processors → EnvironmentVariable
 ```
 
-The decrypted value is stored in `EnvironmentVariable::$rawValue` and populated into `$_ENV`/`$_SERVER`. The original encrypted string is never stored in application-accessible state.
+- `EnvironmentVariable::$rawValue` holds the decrypted string, which is also what `$_ENV`/`$_SERVER` receive; `$encrypted` is `true` when the source stored the value encrypted. `debug()` reports it, and the CLI masks those values (SPEC-008).
+- **References to encrypted values receive the plaintext.** A same-file reference is decrypted through `InterpolationContext::$valueFilter`; a reference to an earlier file uses the already-decrypted value. `DATABASE_URL="pgsql://app:${DB_PASSWORD}@db/app"` therefore works when `DB_PASSWORD` is encrypted.
+- **Cache:** with a key configured, `dumpCache()` stores every value encrypted, including plaintext derived from secrets (ADR-005).
 
 ## 8. Configuration
 
@@ -159,9 +164,12 @@ $config = new DotenvConfiguration(
 
 ### 8.2 Via Environment Variable
 
-If `DotenvConfiguration::$encryptionKey` is null, the Dotenv constructor checks:
+If `DotenvConfiguration::$encryptionKey` is null, the Dotenv constructor checks, in order:
 1. `$_SERVER['DOTENV_PRIVATE_KEY']`
 2. `$_ENV['DOTENV_PRIVATE_KEY']`
+3. `getenv('DOTENV_PRIVATE_KEY')` — for runtimes that expose it only to the process environment (e.g. PHP-FPM with `clear_env = no`)
+
+An empty string counts as no key.
 
 This allows setting the key once in the container orchestrator.
 
@@ -182,32 +190,22 @@ If no encryption key is available, encrypted values remain as-is (the literal `e
 
 ## 10. Error Conditions
 
-| Condition | Exception | Message |
+All errors are `KaririCode\Dotenv\Exception\EncryptionException` (extends `DotenvException`) created by named factories (E-011). Messages never contain key material or plaintext.
+
+| Condition | Factory | Message |
 |---|---|---|
-| Key not 32 bytes | `InvalidArgumentException` | "Encryption key must be 32 bytes (256-bit) or 64-char hex string." |
-| `openssl_encrypt()` fails | `RuntimeException` | "Encryption failed: {openssl_error_string}" |
-| Invalid base64 payload | `RuntimeException` | "Invalid encrypted payload: malformed base64 or too short." |
-| Decryption failure (wrong key, corruption) | `RuntimeException` | "Decryption failed — wrong key or corrupted payload." |
+| Key is not 32 raw bytes or 64 hex chars | `invalidKey()` | "Encryption key must be 32 raw bytes or a 64-character hex string (256-bit)." |
+| `KeyPair::fromPrivateKey()` input is not 64 hex chars | `invalidPrivateKey()` | "Private key must be a 64-character hex string (256-bit)." |
+| `openssl_encrypt()` fails | `encryptionFailed($reason)` | "Encryption failed: {openssl_error_string}" |
+| Payload is not base64 or shorter than 28 bytes | `malformedPayload()` | "Invalid encrypted payload: malformed base64 or too short." |
+| Wrong key, tampering or corruption (tag mismatch) | `decryptionFailed()` | "Decryption failed — wrong key or corrupted payload." |
+
+**Change in 4.5.0:** 4.4 threw `\InvalidArgumentException` / `\RuntimeException`. Code catching those must catch `EncryptionException` (or `DotenvException`) instead.
 
 ## 11. CLI Commands
 
-### 11.1 `keygen`
+Full behavior and real output: SPEC-008 §4.3, §4.4 and §4.9.
 
-Generates a new key pair and prints both values.
-
-### 11.2 `encrypt`
-
-Encrypts all plaintext values in a `.env` file, writing the result to the same file or a specified output path.
-
-```bash
-vendor/bin/kariricode-dotenv encrypt .env --key=a1b2c3d4...
-vendor/bin/kariricode-dotenv encrypt .env --key=a1b2c3d4... --output=.env.encrypted
-```
-
-### 11.3 `decrypt`
-
-Decrypts all encrypted values, producing a plaintext `.env` file.
-
-```bash
-vendor/bin/kariricode-dotenv decrypt .env --key=a1b2c3d4...
-```
+- `keygen` — prints a new key and its 8-character ID.
+- `encrypt [file] [--key] [--output]` — encrypts each value exactly as the parser reads it, so the application loads identical values afterwards; values with `${VAR}`/`$VAR` references are skipped (encrypting them would freeze the reference); layout, comments and multiline values are preserved. Without `--key`, a new key is generated and printed.
+- `decrypt [file] [--key] [--output]` — writes each plaintext in a quoting the parser reads back byte-for-byte; a wrong key leaves the file untouched and exits 1.

@@ -1,8 +1,12 @@
 # ADR-002: Immutable Configuration and Value Objects
 
-**Status:** Accepted
-**Date:** 2024-01-15
-**Applies to:** KaririCode\Dotenv 4.0+
+| Field | Value |
+|---|---|
+| **Status** | Accepted |
+| **Introduced** | 4.0.0 |
+| **ARFA 1.3** | P1 (Immutable State) |
+| **Errata** | E-001, E-002, E-004, E-006 |
+| **Date** | 2026-02-28 · revised 2026-09-29 (4.5.0) |
 
 ## Context
 

@@ -1,8 +1,12 @@
-# SPEC-006: Variable Processors
+# SPEC-007: Variable Processors
 
-**Version:** 1.0
-**Date:** 2024-03-01
-**Applies to:** KaririCode\Dotenv 4.4+
+| Field | Value |
+|---|---|
+| **Version** | 4.5.0 |
+| **Introduced** | 4.4.0 |
+| **ARFA 1.3** | P4 (Protocol Agnosticism) |
+| **Errata** | E-011 |
+| **Date** | 2026-02-28 · revised 2026-09-29 (4.5.0) |
 
 ## 1. Overview
 
@@ -79,8 +83,19 @@ Splits a comma-delimited string into an array of trimmed values.
 ```php
 final readonly class CsvToArrayProcessor implements VariableProcessor
 {
-    public function __construct(private string $separator = ',') {}
+    /** @var non-empty-string */
+    private string $separator;
 
+    public function __construct(string $separator = ',')
+    {
+        if ($separator === '') {
+            throw ConfigurationException::emptySeparator();
+        }
+
+        $this->separator = $separator;
+    }
+
+    /** @return list<string> */
     public function process(string $rawValue, mixed $typedValue): array
     {
         if (trim($rawValue) === '') {
@@ -105,16 +120,17 @@ new CsvToArrayProcessor(separator: '|')  // "a|b|c" → ["a", "b", "c"]
 
 ### 5.2 Base64DecodeProcessor
 
-Decodes a base64-encoded raw value. Throws on invalid input.
+Decodes a base64-encoded raw value (strict mode). Invalid input throws `ConversionException::invalidBase64()` — "Invalid base64 value: cannot decode."
 
 ```php
 final readonly class Base64DecodeProcessor implements VariableProcessor
 {
     public function process(string $rawValue, mixed $typedValue): string
     {
-        $decoded = base64_decode($rawValue, strict: true);
+        $decoded = base64_decode($rawValue, true);
+
         if ($decoded === false) {
-            throw new \RuntimeException("Invalid base64 value: cannot decode.");
+            throw ConversionException::invalidBase64();
         }
         return $decoded;
     }
@@ -205,7 +221,9 @@ Note that `EnvironmentVariable::$type` reflects the **original** detection (Stri
 
 ## 8. Interaction with Caching
 
-Processors are **not** invoked when loading from cache. The cache stores raw string values, and type casting + processors run on every load (cache or file). This ensures that processor registration at runtime is always respected.
+The cache stores **raw string values only** (see ADR-005). When loading from cache, each raw value still flows through the full `setVariable()` pipeline — decryption, type detection, type casting, **and processors** all run on every load, whether the source is the cache or a `.env` file.
+
+This is intentional: processors (and custom type detectors/casters) are registered at runtime on the `Dotenv` instance, not persisted in the cache. Running them on every load guarantees that runtime registrations are always applied consistently, and keeps the cache format simple (plain strings, no serialized objects).
 
 ## 9. Error Handling
 

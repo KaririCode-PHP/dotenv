@@ -1,8 +1,12 @@
 # ADR-007: Environment-Aware Cascade Loading
 
-**Status:** Accepted
-**Date:** 2024-02-20
-**Applies to:** KaririCode\Dotenv 4.2+
+| Field | Value |
+|---|---|
+| **Status** | Accepted |
+| **Introduced** | 4.2.0 |
+| **ARFA 1.3** | P4 (Protocol Agnosticism) |
+| **Errata** | E-011 |
+| **Date** | 2026-02-28 · revised 2026-09-29 (4.5.0) |
 
 ## Context
 

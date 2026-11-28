@@ -18,12 +18,13 @@ use KaririCode\Dotenv\Enum\ValueType;
 final readonly class EnvironmentVariable
 {
     /**
-     * @param string    $name       Variable name.
-     * @param string    $rawValue   Original string from the .env file.
-     * @param ValueType $type       Detected type.
-     * @param mixed     $value      Cast PHP value.
-     * @param string    $source     File path or label (e.g., ".env.local", "cache", "environment").
-     * @param bool      $overridden True if this value replaced a previous source.
+     * @param string $name Variable name.
+     * @param string $rawValue Value after decryption, before type casting.
+     * @param ValueType $type Detected type.
+     * @param mixed $value Cast PHP value.
+     * @param string $source File path or label (e.g., ".env.local", "cache", "environment").
+     * @param bool $overridden True if this value replaced a previous source.
+     * @param bool $encrypted True if the source stored this value as `encrypted:...`.
      */
     public function __construct(
         public string $name,
@@ -32,6 +33,7 @@ final readonly class EnvironmentVariable
         public mixed $value,
         public string $source = '',
         public bool $overridden = false,
+        public bool $encrypted = false,
     ) {
     }
 }

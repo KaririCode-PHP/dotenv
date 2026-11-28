@@ -4,13 +4,17 @@ declare(strict_types=1);
 
 namespace KaririCode\Dotenv;
 
+use KaririCode\Dotenv\Cache\CacheSnapshot;
 use KaririCode\Dotenv\Cache\PhpFileCache;
 use KaririCode\Dotenv\Contract\TypeCaster;
 use KaririCode\Dotenv\Contract\TypeDetector;
 use KaririCode\Dotenv\Contract\VariableProcessor;
 use KaririCode\Dotenv\Core\DotenvParser;
+use KaririCode\Dotenv\Core\InterpolationContext;
 use KaririCode\Dotenv\Enum\LoadMode;
 use KaririCode\Dotenv\Enum\ValueType;
+use KaririCode\Dotenv\Exception\CacheException;
+use KaririCode\Dotenv\Exception\ConfigurationException;
 use KaririCode\Dotenv\Exception\FileNotFoundException;
 use KaririCode\Dotenv\Exception\ImmutableException;
 use KaririCode\Dotenv\Exception\ValidationException;
@@ -24,10 +28,10 @@ use KaririCode\Dotenv\ValueObject\EnvironmentVariable;
 /**
  * Production-grade .env file loader for the KaririCode Framework.
  *
- * The first and only PHP dotenv that combines: auto type casting,
- * native AES-256-GCM encryption, OPcache-friendly caching,
- * fluent validation DSL, environment-aware cascade loading,
- * and variable processors — all with zero external dependencies.
+ * Combines auto type casting, native AES-256-GCM encryption,
+ * OPcache-friendly caching, fluent validation DSL, environment-aware
+ * cascade loading, and variable processors — all with zero external
+ * dependencies.
  *
  * ## Quick Start
  *
@@ -49,17 +53,6 @@ use KaririCode\Dotenv\ValueObject\EnvironmentVariable;
  * $dotenv->load(); // Transparently decrypts "encrypted:..." values
  * ```
  *
- * ## Validation DSL
- *
- * ```php
- * $dotenv->validate()
- *     ->required('DB_HOST', 'DB_PORT')
- *     ->isInteger('DB_PORT')->between(1, 65535)
- *     ->isBoolean('APP_DEBUG')
- *     ->allowedValues('APP_ENV', ['local', 'staging', 'production'])
- *     ->assert();
- * ```
- *
  * ## Environment-Aware Loading
  *
  * ```php
@@ -67,32 +60,40 @@ use KaririCode\Dotenv\ValueObject\EnvironmentVariable;
  * $dotenv->bootEnv(); // .env → .env.local → .env.{APP_ENV} → .env.{APP_ENV}.local
  * ```
  *
- * ARFA 1.3 Compliance:
- * - P1 Immutable State: Configuration and EnvironmentVariable are readonly.
- * - P3 Adaptive Context: TypeSystem + processors are extensible.
- * - P4 Protocol Agnostic: Parser accepts any string content.
- * - P5 Continuous Observability: debug() provides full variable introspection.
+ * Spec V4.0 Entity: final, mutable load state behind a narrow API.
+ * ARFA 1.3 Level 1 (Structural):
+ * - P1 Immutable State: DotenvConfiguration and EnvironmentVariable are readonly.
+ * - P4 Protocol Agnostic: the parser accepts any string content.
+ * - P5 Continuous Observability: debug() reports source, type, override and encryption.
  *
  * @package KaririCode\Dotenv
  * @since   4.0.0 ARFA 1.3
  */
 final class Dotenv
 {
+    private const string ENVIRONMENT_NAME_PATTERN = '/\A[A-Za-z0-9][A-Za-z0-9_-]*\z/';
+
     private readonly DotenvParser $parser;
     private readonly TypeSystem $typeSystem;
     private readonly DotenvConfiguration $configuration;
     private readonly string $directory;
+    private readonly ?Encryptor $encryptor;
 
-    /** @var list<string> Resolved file paths to load. */
-    private array $filePaths = [];
+    /** @var list<string> Files given to the constructor; read by load() and safeLoad(). */
+    private readonly array $filePaths;
 
     /** @var array<string, EnvironmentVariable> Loaded variables keyed by name. */
     private array $variables = [];
 
-    /** @var array<string, list<VariableProcessor>> Pattern → processors. */
+    /** @var list<array{0: string, 1: VariableProcessor}> [pattern, processor] in registration order. */
     private array $processors = [];
 
-    private ?Encryptor $encryptor = null;
+    /** @var list<string> Every file the last load considered, present or absent. */
+    private array $sourceFiles = [];
+
+    private string $strategy = CacheSnapshot::STRATEGY_LOAD;
+    private ?string $environment = null;
+    private ?string $requestedEnvironment = null;
     private bool $loaded = false;
 
     public function __construct(
@@ -104,131 +105,106 @@ final class Dotenv
         $this->parser = new DotenvParser();
         $this->typeSystem = new TypeSystem();
         $this->configuration = $configuration ?? new DotenvConfiguration();
+        $this->encryptor = $this->createEncryptor();
 
-        // Initialize encryptor if key provided via config or environment
-        $encryptionKey = $this->configuration->encryptionKey
-            ?? (\is_string($_SERVER['DOTENV_PRIVATE_KEY'] ?? null) ? $_SERVER['DOTENV_PRIVATE_KEY'] : null)
-            ?? (\is_string($_ENV['DOTENV_PRIVATE_KEY'] ?? null) ? $_ENV['DOTENV_PRIVATE_KEY'] : null)
-            ?? null;
+        $paths = [];
 
-        if ($encryptionKey !== null && $encryptionKey !== '') {
-            $this->encryptor = new Encryptor($encryptionKey);
+        foreach ($fileNames === [] ? ['.env'] : $fileNames as $fileName) {
+            $paths[] = $this->directory . DIRECTORY_SEPARATOR . $fileName;
         }
 
-        if ($fileNames === []) {
-            $fileNames = ['.env'];
-        }
-
-        foreach ($fileNames as $fileName) {
-            $this->filePaths[] = $this->directory . DIRECTORY_SEPARATOR . $fileName;
-        }
+        $this->filePaths = $paths;
     }
 
-    // ── Public API ────────────────────────────────────────────────────
+    // ── Loading ──────────────────────────────────────────────────────────
 
     /**
-     * Loads all configured .env files. If a cache file exists and is fresh,
-     * loads from cache instead (zero parsing cost via OPcache).
+     * Loads all configured .env files. When a fresh cache exists for the
+     * same files, loads from it instead (no parsing).
      *
-     * @throws FileNotFoundException When a required file does not exist.
-     * @throws ImmutableException    When a variable conflicts in Immutable mode.
+     * @throws FileNotFoundException When a configured file does not exist.
+     * @throws ImmutableException When a variable conflicts in Immutable mode.
      */
     public function load(): void
     {
-        if ($this->loadFromCache()) {
-            $this->loaded = true;
-
-            return;
-        }
-
-        foreach ($this->filePaths as $filePath) {
-            $this->loadFile($filePath, required: true);
-        }
-
-        $this->loaded = true;
+        $this->loadConfiguredFiles(required: true);
     }
 
     /**
-     * Loads .env files that exist, silently skipping missing ones.
+     * Same as load(), but silently skips missing files.
      */
     public function safeLoad(): void
     {
-        if ($this->loadFromCache()) {
-            $this->loaded = true;
-
-            return;
-        }
-
-        foreach ($this->filePaths as $filePath) {
-            $this->loadFile($filePath, required: false);
-        }
-
-        $this->loaded = true;
+        $this->loadConfiguredFiles(required: false);
     }
 
     /**
-     * Environment-aware cascade loading (inspired by Symfony's bootEnv).
+     * Environment-aware cascade loading.
      *
-     * Loads files in order:
+     * Loads files in order (each one optional):
      * 1. `.env` — base defaults (committed)
      * 2. `.env.local` — local overrides (gitignored)
      * 3. `.env.{env}` — environment-specific defaults (committed)
-     * 4. `.env.{env}.local` — environment-specific local overrides (gitignored)
+     * 4. `.env.{env}.local` — environment-specific local overrides (gitignored, skipped for "test")
      *
-     * The environment name is resolved from $environmentName parameter,
-     * configuration's environmentName, the APP_ENV variable, or defaults to "dev".
+     * The environment is the argument, else the configured environmentName,
+     * else APP_ENV (from the files loaded so far or the process), else "dev".
+     *
+     * @throws ConfigurationException When the environment name is not a safe file-name segment.
      */
     public function bootEnv(?string $environmentName = null): void
     {
-        if ($this->loadFromCache()) {
-            $this->loaded = true;
+        $basePath = $this->directory . DIRECTORY_SEPARATOR . '.env';
+        $requested = $environmentName ?? $this->configuration->environmentName ?? $this->processEnvironmentName();
 
+        if ($requested !== null) {
+            $this->assertValidEnvironmentName($requested);
+        }
+
+        if ($this->loadFromCache(CacheSnapshot::STRATEGY_BOOT_ENV, $requested, $basePath)) {
             return;
         }
 
-        $basePath = $this->directory . DIRECTORY_SEPARATOR . '.env';
-
-        // 1. Base .env
         $this->loadFile($basePath, required: false);
-
-        // 2. .env.local (always loaded for local overrides)
         $this->loadFile($basePath . '.local', required: false);
 
-        // Determine environment name
+        $fromFiles = $this->resolveRawValue('APP_ENV');
         $envName = $environmentName
             ?? $this->configuration->environmentName
-            ?? $this->resolveRawValue('APP_ENV')
-            ?? 'dev';
+            ?? ($fromFiles !== null && $fromFiles !== '' ? $fromFiles : 'dev');
+        $this->assertValidEnvironmentName($envName);
 
-        // 3. .env.{env} (committed env-specific defaults)
+        $sources = [$basePath, $basePath . '.local', "{$basePath}.{$envName}"];
         $this->loadFile("{$basePath}.{$envName}", required: false);
 
-        // 4. .env.{env}.local (skip for "test" to ensure reproducibility)
+        // .env.test.local is skipped so test runs are reproducible
         if ($envName !== 'test') {
+            $sources[] = "{$basePath}.{$envName}.local";
             $this->loadFile("{$basePath}.{$envName}.local", required: false);
         }
 
-        $this->loaded = true;
+        $this->markLoaded(CacheSnapshot::STRATEGY_BOOT_ENV, $envName, $requested, $sources);
     }
 
-    // ── Validation ────────────────────────────────────────────────────
+    // ── Validation ───────────────────────────────────────────────────────
 
     /**
-     * Simple required-presence check (backward compatible with v4.0).
+     * Asserts that all named variables are defined (loaded or in the process environment).
      *
-     * @throws ValidationException When any required variable is missing.
+     * @throws ValidationException Listing every missing variable.
      */
     public function required(string ...$names): void
     {
-        $missing = array_filter(
-            $names,
-            fn (string $name): bool => ! isset($this->variables[$name])
-                && ! isset($_ENV[$name])
-                && ! isset($_SERVER[$name]),
-        );
+        $missing = [];
+
+        foreach ($names as $name) {
+            if ($this->resolveRawValue($name) === null) {
+                $missing[] = $name;
+            }
+        }
 
         if ($missing !== []) {
-            throw ValidationException::missingRequired(array_values($missing));
+            throw ValidationException::missingRequired($missing);
         }
     }
 
@@ -250,18 +226,18 @@ final class Dotenv
     }
 
     /**
-     * Loads and applies a .env.schema file for declarative validation.
+     * Loads (if needed) and applies a .env.schema file for declarative validation.
      *
-     * @throws ValidationException   On any schema violation.
+     * @throws ValidationException On any schema violation.
      * @throws FileNotFoundException When the schema file is missing.
      */
     public function loadWithSchema(string $schemaPath): void
     {
-        if (! $this->loaded) {
+        if (!$this->loaded) {
             $this->load();
         }
 
-        if (! is_file($schemaPath) || ! is_readable($schemaPath)) {
+        if (!is_file($schemaPath) || !is_readable($schemaPath)) {
             throw FileNotFoundException::forPath($schemaPath);
         }
 
@@ -272,13 +248,12 @@ final class Dotenv
         }
 
         $schemaParser = new SchemaParser();
-        $schema = $schemaParser->parse($content);
         $validator = $this->validate();
-        $schemaParser->applyToValidator($schema, $validator);
+        $schemaParser->applyToValidator($schemaParser->parse($content), $validator);
         $validator->assert();
     }
 
-    // ── Accessors ─────────────────────────────────────────────────────
+    // ── Accessors ────────────────────────────────────────────────────────
 
     public function get(string $name, mixed $default = null): mixed
     {
@@ -298,47 +273,74 @@ final class Dotenv
         return $this->loaded;
     }
 
-    // ── Debug & Introspection ─────────────────────────────────────────
+    /**
+     * Environment resolved by the last bootEnv() call (from files, cache or
+     * process); null after load()/safeLoad() or before loading.
+     */
+    public function environment(): ?string
+    {
+        return $this->environment;
+    }
+
+    // ── Debug & Introspection ────────────────────────────────────────────
 
     /**
-     * Returns a debug report with source tracking, types, and override info.
+     * Returns a report with source tracking, types, override and encryption info.
+     * Values are reported decrypted; callers that print it must mask secrets.
      *
-     * @return array<string, array{source: string, rawValue: string, type: string, value: mixed, overridden: bool}>
+     * @return array<string, array{source: string, rawValue: string, type: string, value: mixed, overridden: bool, encrypted: bool}>
      */
     public function debug(): array
     {
         $report = [];
 
-        foreach ($this->variables as $name => $var) {
+        foreach ($this->variables as $name => $variable) {
             $report[$name] = [
-                'source' => $var->source,
-                'rawValue' => $var->rawValue,
-                'type' => $var->type->name,
-                'value' => $var->value,
-                'overridden' => $var->overridden,
+                'source' => $variable->source,
+                'rawValue' => $variable->rawValue,
+                'type' => $variable->type->name,
+                'value' => $variable->value,
+                'overridden' => $variable->overridden,
+                'encrypted' => $variable->encrypted,
             ];
         }
 
         return $report;
     }
 
-    // ── Cache ─────────────────────────────────────────────────────────
+    // ── Cache ────────────────────────────────────────────────────────────
 
     /**
-     * Dumps all loaded variables to a PHP array cache file.
-     * OPcache compiles this once — subsequent requests load from shared memory.
+     * Writes the loaded variables to an OPcache-friendly PHP file.
+     *
+     * With an encryption key configured, every value is stored encrypted,
+     * so the cache never holds plaintext secrets — including values that
+     * were interpolated from encrypted ones.
+     *
+     * @throws CacheException When nothing was loaded yet or the file cannot be written.
      */
     public function dumpCache(string $path): void
     {
-        $cache = new PhpFileCache();
-        $rawVariables = [];
-
-        foreach ($this->variables as $name => $var) {
-            $rawVariables[$name] = $var->rawValue;
+        if (!$this->loaded) {
+            throw CacheException::notLoaded();
         }
 
-        $hash = $cache->computeSourceHash($this->filePaths);
-        $cache->dump($path, $rawVariables, $hash);
+        $values = [];
+
+        foreach ($this->variables as $name => $variable) {
+            $values[$name] = $this->encryptor !== null
+                ? $this->encryptor->encrypt($variable->rawValue)
+                : $variable->rawValue;
+        }
+
+        new PhpFileCache()->dump($path, new CacheSnapshot(
+            $this->strategy,
+            $this->environment,
+            $this->requestedEnvironment,
+            $this->sourceFiles,
+            $values,
+            $this->encryptor !== null,
+        ));
     }
 
     public function clearCache(string $path): void
@@ -346,7 +348,7 @@ final class Dotenv
         new PhpFileCache()->clear($path);
     }
 
-    // ── Extension Points ──────────────────────────────────────────────
+    // ── Extension Points ─────────────────────────────────────────────────
 
     public function addTypeDetector(TypeDetector $detector): void
     {
@@ -361,17 +363,47 @@ final class Dotenv
     /**
      * Registers a post-load processor for variables matching a name or glob pattern.
      *
-     * @param string            $pattern   Exact name or glob (e.g., "*_URL", "ALLOWED_IPS").
-     * @param VariableProcessor $processor Transformer to apply after type casting.
+     * @param string $pattern Exact name or glob (e.g., "*_URL", "ALLOWED_IPS").
+     * @param VariableProcessor $processor Transformer applied after type casting.
      */
     public function addProcessor(string $pattern, VariableProcessor $processor): void
     {
-        $this->processors[$pattern][] = $processor;
+        $this->processors[] = [$pattern, $processor];
     }
 
-    // ── Internal ──────────────────────────────────────────────────────
+    // ── Internal: Loading ────────────────────────────────────────────────
 
-    private function loadFromCache(): bool
+    private function loadConfiguredFiles(bool $required): void
+    {
+        if ($this->loadFromCache(CacheSnapshot::STRATEGY_LOAD, null, null)) {
+            return;
+        }
+
+        foreach ($this->filePaths as $filePath) {
+            $this->loadFile($filePath, $required);
+        }
+
+        $this->markLoaded(CacheSnapshot::STRATEGY_LOAD, null, null, $this->filePaths);
+    }
+
+    /**
+     * @param list<string> $sources
+     */
+    private function markLoaded(string $strategy, ?string $environment, ?string $requested, array $sources): void
+    {
+        $this->strategy = $strategy;
+        $this->environment = $environment;
+        $this->requestedEnvironment = $requested;
+        $this->sourceFiles = $sources;
+        $this->loaded = true;
+    }
+
+    /**
+     * Uses the cache only when it was produced by the same loader, for the
+     * same files and the same requested environment, and every recorded
+     * source file is unchanged (checked by PhpFileCache).
+     */
+    private function loadFromCache(string $strategy, ?string $requested, ?string $basePath): bool
     {
         $cachePath = $this->configuration->cachePath;
 
@@ -379,32 +411,36 @@ final class Dotenv
             return false;
         }
 
-        $cache = new PhpFileCache();
-        $hash = $cache->computeSourceHash($this->filePaths);
-        $cached = $cache->load($cachePath, $hash);
+        $snapshot = new PhpFileCache()->load($cachePath);
 
-        if ($cached === null) {
+        if ($snapshot === null
+            || $snapshot->strategy !== $strategy
+            || $snapshot->requestedEnvironment !== $requested
+            || ($snapshot->encrypted && $this->encryptor === null)
+        ) {
             return false;
         }
 
-        foreach ($cached as $name => $rawValue) {
-            $this->setVariable($name, $rawValue, 'cache');
+        $sameFiles = $strategy === CacheSnapshot::STRATEGY_LOAD
+            ? $snapshot->sources === $this->filePaths
+            : ($snapshot->sources[0] ?? null) === $basePath;
+
+        if (!$sameFiles) {
+            return false;
         }
+
+        foreach ($snapshot->variables as $name => $value) {
+            $this->setVariable($name, $value, 'cache');
+        }
+
+        $this->markLoaded($strategy, $snapshot->environment, $requested, $snapshot->sources);
 
         return true;
     }
 
     private function loadFile(string $filePath, bool $required): void
     {
-        if (! is_file($filePath) || ! is_readable($filePath)) {
-            if ($required) {
-                throw FileNotFoundException::forPath($filePath);
-            }
-
-            return;
-        }
-
-        $content = file_get_contents($filePath);
+        $content = is_file($filePath) && is_readable($filePath) ? file_get_contents($filePath) : false;
 
         if ($content === false) {
             if ($required) {
@@ -414,93 +450,175 @@ final class Dotenv
             return;
         }
 
-        $rawVariables = $this->parser->parse(
+        $parsed = $this->parser->parse(
             $content,
             $filePath,
             $this->configuration->strictNames,
+            $this->interpolationContext(),
         );
 
         $source = basename($filePath);
 
-        foreach ($rawVariables as $name => $rawValue) {
-            $this->setVariable($name, $rawValue, $source);
+        foreach ($parsed as $name => $value) {
+            $this->setVariable($name, $value, $source);
         }
     }
 
-    private function setVariable(string $name, string $rawValue, string $source): void
+    /**
+     * References in the next file see: variables already loaded (decrypted),
+     * and — under SkipExisting — the pre-existing environment values that
+     * win over the file's own definitions.
+     */
+    private function interpolationContext(): InterpolationContext
     {
-        // Allow/Deny list filtering
-        if (! $this->isAllowed($name)) {
+        $inherited = [];
+
+        foreach ($this->variables as $name => $variable) {
+            $inherited[$name] = $variable->rawValue;
+        }
+
+        $encryptor = $this->encryptor;
+
+        return new InterpolationContext(
+            $inherited,
+            $this->configuration->loadMode === LoadMode::SkipExisting ? $this->preExistingEnvironment() : [],
+            $encryptor === null ? null : static fn (string $value): string => $encryptor->decrypt($value),
+        );
+    }
+
+    private function setVariable(string $name, string $sourceValue, string $source): void
+    {
+        if (!$this->isAllowed($name)) {
             return;
         }
 
-        $alreadyExists = isset($_ENV[$name]) || isset($_SERVER[$name]) || getenv($name) !== false;
+        // Pre-existing = present in the process before this instance loaded it.
+        // Variables loaded by an earlier file of this instance are cascade overrides.
+        $preExisting = !isset($this->variables[$name]) && $this->existsInProcess($name);
 
-        // Immutable: throw if variable existed BEFORE this instance loaded it
-        if ($this->configuration->loadMode === LoadMode::Immutable
-            && $alreadyExists
-            && ! isset($this->variables[$name])
-        ) {
+        if ($preExisting && $this->configuration->loadMode === LoadMode::Immutable) {
             throw ImmutableException::alreadyDefined($name);
         }
 
-        // SkipExisting: silently skip pre-existing environment variables
-        if ($this->configuration->loadMode === LoadMode::SkipExisting && $alreadyExists) {
+        if ($preExisting && $this->configuration->loadMode === LoadMode::SkipExisting) {
             return;
         }
 
-        // Decrypt encrypted values transparently
-        $decryptedValue = $rawValue;
-        if ($this->encryptor !== null && Encryptor::isEncrypted($rawValue)) {
-            $decryptedValue = $this->encryptor->decrypt($rawValue);
-        }
+        $encrypted = Encryptor::isEncrypted($sourceValue);
+        $value = $encrypted && $this->encryptor !== null
+            ? $this->encryptor->decrypt($sourceValue)
+            : $sourceValue;
 
-        // Type detection and casting
         $type = ValueType::String;
-        $typedValue = $decryptedValue;
+        $typedValue = $value;
 
         if ($this->configuration->typeCasting) {
-            $type = $this->typeSystem->detect($decryptedValue);
-            $typedValue = $this->typeSystem->cast($decryptedValue, $type);
+            $type = $this->typeSystem->detect($value);
+            $typedValue = $this->typeSystem->cast($value, $type);
         }
 
-        // Apply registered processors
-        $typedValue = $this->applyProcessors($name, $decryptedValue, $typedValue);
+        $typedValue = $this->applyProcessors($name, $value, $typedValue);
 
-        $overridden = isset($this->variables[$name]);
         $this->variables[$name] = new EnvironmentVariable(
             $name,
-            $decryptedValue,
+            $value,
             $type,
             $typedValue,
             $source,
-            $overridden,
+            isset($this->variables[$name]),
+            $encrypted,
         );
 
-        // Populate environment with decrypted raw string
         if ($this->configuration->populateEnv) {
-            $_ENV[$name] = $decryptedValue;
+            $_ENV[$name] = $value;
         }
 
         if ($this->configuration->populateServer) {
-            $_SERVER[$name] = $decryptedValue;
+            $_SERVER[$name] = $value;
         }
 
         if ($this->configuration->usePutenv) {
-            putenv("{$name}={$decryptedValue}");
+            putenv("{$name}={$value}");
         }
     }
 
+    // ── Internal: Environment ────────────────────────────────────────────
+
+    private function createEncryptor(): ?Encryptor
+    {
+        $key = $this->configuration->encryptionKey;
+
+        if ($key === null) {
+            // getenv() covers runtimes that expose the key only to the process
+            // environment (e.g. PHP-FPM with clear_env = no).
+            $fromProcess = $_SERVER['DOTENV_PRIVATE_KEY'] ?? $_ENV['DOTENV_PRIVATE_KEY'] ?? getenv('DOTENV_PRIVATE_KEY');
+            $key = is_string($fromProcess) ? $fromProcess : null;
+        }
+
+        return $key !== null && $key !== '' ? new Encryptor($key) : null;
+    }
+
+    private function existsInProcess(string $name): bool
+    {
+        return isset($_ENV[$name]) || isset($_SERVER[$name]) || getenv($name) !== false;
+    }
+
+    /**
+     * String values present in the process but not loaded by this instance.
+     * Precedence mirrors resolveRawValue(): $_ENV, then $_SERVER, then getenv().
+     *
+     * @return array<string, string>
+     */
+    private function preExistingEnvironment(): array
+    {
+        $environment = [];
+
+        foreach ([getenv(), $_SERVER, $_ENV] as $source) {
+            foreach ($source as $name => $value) {
+                if (is_string($name) && is_string($value)) {
+                    $environment[$name] = $value;
+                }
+            }
+        }
+
+        return array_diff_key($environment, $this->variables);
+    }
+
+    private function processEnvironmentName(): ?string
+    {
+        $value = $_ENV['APP_ENV'] ?? $_SERVER['APP_ENV'] ?? getenv('APP_ENV');
+
+        return is_string($value) && $value !== '' ? $value : null;
+    }
+
+    private function assertValidEnvironmentName(string $name): void
+    {
+        if (preg_match(self::ENVIRONMENT_NAME_PATTERN, $name) !== 1) {
+            throw ConfigurationException::invalidEnvironmentName($name);
+        }
+    }
+
+    private function resolveRawValue(string $name): ?string
+    {
+        if (isset($this->variables[$name])) {
+            return $this->variables[$name]->rawValue;
+        }
+
+        $value = $_ENV[$name] ?? $_SERVER[$name] ?? getenv($name);
+
+        return is_string($value) ? $value : null;
+    }
+
+    // ── Internal: Filtering & Processing ─────────────────────────────────
+
     private function isAllowed(string $name): bool
     {
-        // Deny list takes precedence
         foreach ($this->configuration->denyList as $pattern) {
             if ($this->matchGlob($pattern, $name)) {
                 return false;
             }
         }
 
-        // Empty allow list means everything allowed
         if ($this->configuration->allowList === []) {
             return true;
         }
@@ -520,45 +638,19 @@ final class Dotenv
             return true;
         }
 
-        $regex = '/\A' . str_replace(
-            ['\*', '\?'],
-            ['.*', '.'],
-            preg_quote($pattern, '/'),
-        ) . '\z/';
+        $regex = '/\A' . str_replace(['\*', '\?'], ['.*', '.'], preg_quote($pattern, '/')) . '\z/';
 
         return preg_match($regex, $name) === 1;
     }
 
-    private function applyProcessors(string $name, string $rawValue, mixed $typedValue): mixed
+    private function applyProcessors(string $name, string $value, mixed $typedValue): mixed
     {
-        foreach ($this->processors as $pattern => $processorList) {
+        foreach ($this->processors as [$pattern, $processor]) {
             if ($this->matchGlob($pattern, $name)) {
-                foreach ($processorList as $processor) {
-                    $typedValue = $processor->process($rawValue, $typedValue);
-                }
+                $typedValue = $processor->process($value, $typedValue);
             }
         }
 
         return $typedValue;
-    }
-
-    private function resolveRawValue(string $name): ?string
-    {
-        if (isset($this->variables[$name])) {
-            return $this->variables[$name]->rawValue;
-        }
-
-        $envVal = $_ENV[$name] ?? null;
-        $serverVal = $_SERVER[$name] ?? null;
-
-        if (\is_string($envVal)) {
-            return $envVal;
-        }
-
-        if (\is_string($serverVal)) {
-            return $serverVal;
-        }
-
-        return null;
     }
 }

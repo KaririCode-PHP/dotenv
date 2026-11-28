@@ -30,8 +30,7 @@ use KaririCode\Dotenv\Type\Detector\NullDetector;
  * Both detectors and casters can be replaced or extended at runtime via
  * addDetector() and addCaster(), supporting the Open/Closed Principle.
  *
- * ARFA 1.3 P3: Adaptive Context — the type system adapts to application needs
- * by allowing custom detectors/casters without modifying core code.
+ * Spec V4.0 Entity: final, internal detector list sorted lazily on first use.
  *
  * @package KaririCode\Dotenv
  * @since   4.0.0 ARFA 1.3
@@ -94,7 +93,7 @@ final class TypeSystem
         return $this->cast($value, $type);
     }
 
-    // ── Internal ──────────────────────────────────────────────────────
+    // ── Internal ─────────────────────────────────────────────────────────
 
     private function registerDefaults(): void
     {

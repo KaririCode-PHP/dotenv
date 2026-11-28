@@ -14,13 +14,11 @@ final readonly class AllowedValuesRule implements ValidationRule
     ) {
     }
 
-    #[\Override]
     public function passes(string $value): bool
     {
-        return \in_array($value, $this->allowed, true);
+        return in_array($value, $this->allowed, true);
     }
 
-    #[\Override]
     public function message(): string
     {
         $list = implode(', ', $this->allowed);

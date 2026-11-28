@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace KaririCode\Dotenv\Tests\Unit\Processor;
 
+use KaririCode\Dotenv\Exception\ConfigurationException;
+use KaririCode\Dotenv\Exception\ConversionException;
 use KaririCode\Dotenv\Processor\Base64DecodeProcessor;
 use KaririCode\Dotenv\Processor\CsvToArrayProcessor;
 use KaririCode\Dotenv\Processor\TrimProcessor;
@@ -12,7 +14,7 @@ use PHPUnit\Framework\TestCase;
 
 final class ProcessorTest extends TestCase
 {
-    // ── CsvToArrayProcessor ───────────────────────────────────────────
+    // ── CsvToArrayProcessor ──────────────────────────────────────────────
 
     public function testCsvToArraySplitsCommaDelimited(): void
     {
@@ -44,7 +46,7 @@ final class ProcessorTest extends TestCase
         );
     }
 
-    // ── Base64DecodeProcessor ─────────────────────────────────────────
+    // ── Base64DecodeProcessor ────────────────────────────────────────────
 
     public function testBase64DecodeProcessesValidInput(): void
     {
@@ -58,13 +60,13 @@ final class ProcessorTest extends TestCase
     {
         $processor = new Base64DecodeProcessor();
 
-        $this->expectException(\RuntimeException::class);
+        $this->expectException(ConversionException::class);
         $this->expectExceptionMessage('Invalid base64');
 
         $processor->process('!!!invalid!!!', '!!!invalid!!!');
     }
 
-    // ── TrimProcessor ─────────────────────────────────────────────────
+    // ── TrimProcessor ────────────────────────────────────────────────────
 
     public function testTrimRemovesWhitespace(): void
     {
@@ -81,7 +83,7 @@ final class ProcessorTest extends TestCase
         self::assertSame('path', $processor->process('/path/', '/path/'));
     }
 
-    // ── UrlNormalizerProcessor ────────────────────────────────────────
+    // ── UrlNormalizerProcessor ───────────────────────────────────────────
 
     public function testUrlNormalizerAddsTrailingSlash(): void
     {
@@ -105,5 +107,12 @@ final class ProcessorTest extends TestCase
         $raw = 'https://api.example.com//';
 
         self::assertSame('https://api.example.com/', $processor->process($raw, $raw));
+    }
+
+    public function testCsvToArrayRejectsAnEmptySeparator(): void
+    {
+        $this->expectException(ConfigurationException::class);
+
+        new CsvToArrayProcessor(separator: '');
     }
 }

@@ -1,8 +1,12 @@
 # ADR-001: Zero External Dependencies
 
-**Status:** Accepted
-**Date:** 2024-01-15
-**Applies to:** KaririCode\Dotenv 4.x
+| Field | Value |
+|---|---|
+| **Status** | Accepted |
+| **Introduced** | 4.0.0 |
+| **ARFA 1.3** | P4 (Protocol Agnosticism) |
+| **Errata** | E-012 |
+| **Date** | 2026-02-28 · revised 2026-09-29 (4.5.0) |
 
 ## Context
 
@@ -23,7 +27,7 @@ All functionality — parsing, type detection, casting, validation, encryption, 
 - **Validation:** `filter_var()`, `is_numeric()`, `preg_match()`
 - **CLI:** `$argv`, `fwrite(STDOUT)`, `file_get_contents()`
 
-Development tooling (PHPUnit, PHPStan, PHP-CS-Fixer, Rector) is provided externally by the [KaririCode Devkit](https://github.com/KaririCode-Framework/kariricode-devkit) (`kcode.phar`) — a zero-dependency global PHAR that manages all dev tool configurations across the KaririCode ecosystem. The `composer.json` carries `require-dev: {}` — no dev dependencies at all.
+Development dependencies (PHPUnit, PHPStan, PHP-CS-Fixer) are in `require-dev` only.
 
 ## Consequences
 

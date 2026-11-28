@@ -1,8 +1,12 @@
 # ADR-008: Batch Error Validation with Fluent DSL
 
-**Status:** Accepted
-**Date:** 2024-02-05
-**Applies to:** KaririCode\Dotenv 4.1+
+| Field | Value |
+|---|---|
+| **Status** | Accepted |
+| **Introduced** | 4.1.0 |
+| **ARFA 1.3** | P5 (Observability) |
+| **Errata** | E-011 |
+| **Date** | 2026-02-28 · revised 2026-09-29 (4.5.0) |
 
 ## Context
 
@@ -38,17 +42,20 @@ public function assert(): void
 {
     $errors = [];
 
-    // Check required presence first
-    foreach ($this->requiredNames as $name) {
+    foreach (array_unique($this->requiredNames) as $name) {
         if (($this->valueResolver)($name) === null) {
             $errors[] = "{$name} is required but not defined.";
         }
     }
 
-    // Run rules per variable
+    // Rules only run against present values. An absent required variable
+    // is already reported above; an absent optional one is not an error.
     foreach ($this->rules as $name => $ruleList) {
         $value = ($this->valueResolver)($name);
-        if ($value === null) { continue; } // Skip absent (already reported or conditional)
+
+        if ($value === null) {
+            continue;
+        }
 
         foreach ($ruleList as $rule) {
             if (!$rule->passes($value)) {
@@ -70,23 +77,21 @@ The `ValidationException` carries both a human-readable message and a structured
 The validator maintains a `$currentTargets` array that tracks which variables subsequent rules apply to. Targeting methods update this state:
 
 - `required('A', 'B')` — sets targets to `['A', 'B']`, marks as required.
-- `ifPresent('C')` — sets targets to `['C']`, enables conditional mode.
+- `ifPresent('C')` — sets targets to `['C']` (no presence check).
 - `isInteger('D')` — adds IsIntegerRule to `D`, sets target to `['D']`.
 - `between(1, 65535)` — adds BetweenRule to current targets (inherits from prior call).
 
 This allows natural chaining: `->isInteger('PORT')->between(1, 65535)` applies both rules to `PORT`.
 
-### Conditional Validation (`ifPresent`)
+### Optional Variables (`ifPresent`)
 
-Variables targeted via `ifPresent()` are tracked in a `$conditionalNames` map. During `assert()`, if a conditional variable is absent, its rules are silently skipped:
+Rules never run against an absent variable: an absent required variable is already reported by the presence check, and an absent optional one is not an error. `ifPresent()` therefore adds no machinery — it is the explicit, self-documenting way to target an optional variable: "If REDIS_HOST is set, it must not be empty."
 
 ```php
-if ($value === null && $this->isConditional($name)) {
-    continue; // No error for absent conditional variable
-}
+$validator->ifPresent('REDIS_HOST')->notEmpty();   // absent → no error; present and empty → error
 ```
 
-This supports optional configuration: "If REDIS_HOST is set, it must not be empty."
+**Change in 4.5.0:** 4.4 tracked `ifPresent()` targets in a `$conditionalNames` map, but every branch of `assert()` already skipped absent variables, so the map never changed an outcome. It was removed; behavior is unchanged.
 
 ### ValidationRule Contract
 
@@ -125,7 +130,7 @@ $validator->custom('VAR_NAME', fn(string $v) => strlen($v) >= 8, '{name} must be
 **Positive:**
 - All errors surfaced in one pass — setup/debugging cycle reduced from O(n) restarts to O(1).
 - Fluent API is readable as a specification document.
-- Conditional validation avoids false positives for optional configuration.
+- Optional variables (`ifPresent()`) are validated only when set, without false positives.
 - Custom rules require no subclassing — closures or `ValidationRule` implementations work equally.
 - `{name}` placeholder in messages enables reusable rule instances across variables.
 

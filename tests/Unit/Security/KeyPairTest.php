@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace KaririCode\Dotenv\Tests\Unit\Security;
 
+use KaririCode\Dotenv\Exception\EncryptionException;
 use KaririCode\Dotenv\Security\KeyPair;
 use PHPUnit\Framework\TestCase;
 
@@ -13,9 +14,9 @@ final class KeyPairTest extends TestCase
     {
         $kp = KeyPair::generate();
 
-        $this->assertSame(64, \strlen($kp->privateKey));
+        $this->assertSame(64, strlen($kp->privateKey));
         $this->assertTrue(ctype_xdigit($kp->privateKey));
-        $this->assertSame(8, \strlen($kp->publicId));
+        $this->assertSame(8, strlen($kp->publicId));
     }
 
     public function testGenerateProducesUniqueKeys(): void
@@ -37,14 +38,14 @@ final class KeyPairTest extends TestCase
 
     public function testFromPrivateKeyRejectsInvalidLength(): void
     {
-        $this->expectException(\InvalidArgumentException::class);
+        $this->expectException(EncryptionException::class);
 
         KeyPair::fromPrivateKey('abcdef');
     }
 
     public function testFromPrivateKeyRejectsNonHex(): void
     {
-        $this->expectException(\InvalidArgumentException::class);
+        $this->expectException(EncryptionException::class);
 
         KeyPair::fromPrivateKey(str_repeat('g', 64));
     }

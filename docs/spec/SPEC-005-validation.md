@@ -1,15 +1,19 @@
-# SPEC-004: Validation
+# SPEC-005: Validation
 
-**Version:** 1.0
-**Date:** 2024-02-05
-**Applies to:** KaririCode\Dotenv 4.1+
+| Field | Value |
+|---|---|
+| **Version** | 4.5.0 |
+| **Introduced** | 4.1.0 |
+| **ARFA 1.3** | P5 (Observability) |
+| **Errata** | E-011 |
+| **Date** | 2026-02-28 · revised 2026-09-29 (4.5.0) |
 
 ## 1. Overview
 
 KaririCode\Dotenv provides two validation mechanisms:
 
 1. **Fluent DSL** — Programmatic rule definition via `EnvironmentValidator`.
-2. **Schema file** — Declarative rule definition via `.env.schema` (see SPEC-005).
+2. **Schema file** — Declarative rule definition via `.env.schema` (see SPEC-006).
 
 Both mechanisms collect all failures before throwing a single `ValidationException`.
 
@@ -49,7 +53,7 @@ These methods set the current target variables for subsequent rule methods.
 | Method | Behavior |
 |---|---|
 | `required(string ...$names): self` | Marks variables as required (must exist). Sets targets. |
-| `ifPresent(string ...$names): self` | Sets targets. Rules only apply if variable exists. |
+| `ifPresent(string ...$names): self` | Sets targets without a presence check — the explicit way to mark optional variables. |
 
 ### 3.2 Rule Methods
 
@@ -87,10 +91,11 @@ public function assert(): void
 
 1. Checks all `required` variables for presence.
 2. Iterates all variables with registered rules.
-3. Skips absent variables in conditional mode (`ifPresent`).
-4. Skips absent required variables from rule execution (already reported as missing).
-5. Collects all failure messages.
-6. Throws `ValidationException::batchErrors($errors)` if any failures exist.
+3. Skips every absent variable: a required one was already reported in step 1, an optional one is not an error.
+4. Collects all failure messages.
+5. Throws `ValidationException::batchErrors($errors)` if any failures exist.
+
+Rules never run against absent variables, with or without `ifPresent()`; `ifPresent()` only documents intent.
 
 ## 4. Built-in Rules
 
@@ -147,6 +152,8 @@ preg_match($pattern, $value) === 1
 ```
 
 Message: `"{name} must match pattern {pattern}."`
+
+The pattern is compiled when the rule is created. An invalid pattern throws `ConfigurationException::invalidRegexPattern()` — "Invalid regular expression: {pattern}" — instead of emitting a PHP warning and failing every value.
 
 ### 4.8 UrlRule
 

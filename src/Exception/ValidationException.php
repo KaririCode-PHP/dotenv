@@ -19,9 +19,15 @@ final class ValidationException extends DotenvException
     /** @param list<string> $missing */
     public static function missingRequired(array $missing): self
     {
-        return new self(
+        $exception = new self(
             'Missing required environment variables: ' . implode(', ', $missing),
         );
+        $exception->errors = array_map(
+            static fn (string $name): string => "{$name} is required but not defined.",
+            $missing,
+        );
+
+        return $exception;
     }
 
     /** @param list<string> $errors */
@@ -37,7 +43,10 @@ final class ValidationException extends DotenvException
 
     public static function schemaViolation(string $message): self
     {
-        return new self("Schema validation failed: {$message}");
+        $exception = new self("Schema validation failed: {$message}");
+        $exception->errors = [$message];
+
+        return $exception;
     }
 
     /** @return list<string> */

@@ -15,13 +15,11 @@ final readonly class CustomRule implements ValidationRule
     ) {
     }
 
-    #[\Override]
     public function passes(string $value): bool
     {
         return ($this->callback)($value);
     }
 
-    #[\Override]
     public function message(): string
     {
         return $this->failureMessage;

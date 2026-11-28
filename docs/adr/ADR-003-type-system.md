@@ -1,8 +1,12 @@
 # ADR-003: Pluggable Type System with Priority-Based Detection
 
-**Status:** Accepted
-**Date:** 2024-01-20
-**Applies to:** KaririCode\Dotenv 4.0+
+| Field | Value |
+|---|---|
+| **Status** | Accepted |
+| **Introduced** | 4.0.0 |
+| **ARFA 1.3** | P1 (Immutable State) |
+| **Errata** | E-003 |
+| **Date** | 2026-02-28 · revised 2026-09-29 (4.5.0) |
 
 ## Context
 

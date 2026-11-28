@@ -12,13 +12,6 @@ namespace KaririCode\Dotenv\Exception;
  */
 final class ParseException extends DotenvException
 {
-    public static function invalidLine(string $line, int $lineNumber, string $filePath): self
-    {
-        return new self(
-            "Invalid syntax at line {$lineNumber} in {$filePath}: {$line}",
-        );
-    }
-
     public static function invalidVariableName(string $name, int $lineNumber, string $filePath, bool $strict = false): self
     {
         $pattern = $strict
@@ -35,13 +28,6 @@ final class ParseException extends DotenvException
     {
         return new self(
             "Unterminated quoted value at line {$lineNumber} in {$filePath}",
-        );
-    }
-
-    public static function circularReference(string $variable, string $filePath): self
-    {
-        return new self(
-            "Circular variable reference detected for '{$variable}' in {$filePath}",
         );
     }
 }

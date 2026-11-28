@@ -5,24 +5,34 @@ declare(strict_types=1);
 namespace KaririCode\Dotenv\Processor;
 
 use KaririCode\Dotenv\Contract\VariableProcessor;
+use KaririCode\Dotenv\Exception\ConfigurationException;
 
 final readonly class CsvToArrayProcessor implements VariableProcessor
 {
-    public function __construct(
-        private string $separator = ',',
-    ) {
+    /** @var non-empty-string */
+    private string $separator;
+
+    /**
+     * @throws ConfigurationException When the separator is empty.
+     */
+    public function __construct(string $separator = ',')
+    {
+        if ($separator === '') {
+            throw ConfigurationException::emptySeparator();
+        }
+
+        $this->separator = $separator;
     }
 
-    /** @return list<string> */
-    #[\Override]
+    /**
+     * @return list<string>
+     */
     public function process(string $rawValue, mixed $typedValue): array
     {
         if (trim($rawValue) === '') {
             return [];
         }
 
-        $separator = $this->separator !== '' ? $this->separator : ',';
-
-        return array_map(trim(...), explode($separator, $rawValue));
+        return array_map(trim(...), explode($this->separator, $rawValue));
     }
 }

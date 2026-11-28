@@ -7,6 +7,9 @@ namespace KaririCode\Dotenv\Tests\Unit\Type;
 use KaririCode\Dotenv\Contract\TypeCaster;
 use KaririCode\Dotenv\Contract\TypeDetector;
 use KaririCode\Dotenv\Enum\ValueType;
+use KaririCode\Dotenv\Exception\ConversionException;
+use KaririCode\Dotenv\Type\Caster\ArrayCaster;
+use KaririCode\Dotenv\Type\Caster\JsonCaster;
 use KaririCode\Dotenv\Type\TypeSystem;
 use PHPUnit\Framework\TestCase;
 
@@ -19,7 +22,7 @@ final class TypeSystemTest extends TestCase
         $this->typeSystem = new TypeSystem();
     }
 
-    // ── Null Detection ────────────────────────────────────────────────
+    // ── Null Detection ───────────────────────────────────────────────────
 
     public function testDetectsNull(): void
     {
@@ -41,7 +44,7 @@ final class TypeSystemTest extends TestCase
         self::assertNull($this->typeSystem->resolve('(null)'));
     }
 
-    // ── Boolean Detection ─────────────────────────────────────────────
+    // ── Boolean Detection ────────────────────────────────────────────────
 
     public function testDetectsBoolean(): void
     {
@@ -82,7 +85,7 @@ final class TypeSystemTest extends TestCase
         self::assertFalse($this->typeSystem->resolve('off'));
     }
 
-    // ── Integer Detection ─────────────────────────────────────────────
+    // ── Integer Detection ────────────────────────────────────────────────
 
     public function testDetectsInteger(): void
     {
@@ -99,7 +102,7 @@ final class TypeSystemTest extends TestCase
         self::assertSame(-10, $this->typeSystem->resolve('-10'));
     }
 
-    // ── Float Detection ───────────────────────────────────────────────
+    // ── Float Detection ──────────────────────────────────────────────────
 
     public function testDetectsFloat(): void
     {
@@ -115,7 +118,7 @@ final class TypeSystemTest extends TestCase
         self::assertSame(-0.5, $this->typeSystem->resolve('-0.5'));
     }
 
-    // ── JSON Detection ────────────────────────────────────────────────
+    // ── JSON Detection ───────────────────────────────────────────────────
 
     public function testDetectsJson(): void
     {
@@ -137,7 +140,7 @@ final class TypeSystemTest extends TestCase
         self::assertSame(ValueType::String, $this->typeSystem->detect('{invalid json}'));
     }
 
-    // ── Array Detection ───────────────────────────────────────────────
+    // ── Array Detection ──────────────────────────────────────────────────
 
     public function testDetectsArray(): void
     {
@@ -153,7 +156,7 @@ final class TypeSystemTest extends TestCase
         self::assertSame(['item1', 'item2'], $result);
     }
 
-    // ── String Fallback ───────────────────────────────────────────────
+    // ── String Fallback ──────────────────────────────────────────────────
 
     public function testFallsBackToString(): void
     {
@@ -167,7 +170,7 @@ final class TypeSystemTest extends TestCase
         self::assertSame('hello world', $this->typeSystem->resolve('hello world'));
     }
 
-    // ── Custom Detector/Caster ────────────────────────────────────────
+    // ── Custom Detector/Caster ───────────────────────────────────────────
 
     public function testCustomDetectorIsRespected(): void
     {
@@ -201,5 +204,28 @@ final class TypeSystemTest extends TestCase
         $this->typeSystem->addCaster(ValueType::Integer, $customCaster);
 
         self::assertSame(4200, $this->typeSystem->resolve('42'));
+    }
+
+    // ── Casters Called Directly ──────────────────────────────────────────
+
+    public function testArrayCasterRejectsJsonObjects(): void
+    {
+        $this->expectException(ConversionException::class);
+
+        new ArrayCaster()->cast('{"a": 1}');
+    }
+
+    public function testJsonCasterRejectsScalarJson(): void
+    {
+        $this->expectException(ConversionException::class);
+
+        new JsonCaster()->cast('"just a string"');
+    }
+
+    public function testMalformedJsonStillFailsFast(): void
+    {
+        $this->expectException(\JsonException::class);
+
+        new JsonCaster()->cast('{broken');
     }
 }

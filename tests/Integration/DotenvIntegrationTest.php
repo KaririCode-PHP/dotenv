@@ -16,50 +16,10 @@ use KaririCode\Dotenv\Processor\UrlNormalizerProcessor;
 use KaririCode\Dotenv\Security\Encryptor;
 use KaririCode\Dotenv\Security\KeyPair;
 use KaririCode\Dotenv\ValueObject\DotenvConfiguration;
-use PHPUnit\Framework\TestCase;
 
-final class DotenvIntegrationTest extends TestCase
+final class DotenvIntegrationTest extends IntegrationTestCase
 {
-    private string $fixturesDir;
-
-    /** @var array<string, string> $_ENV snapshot before each test. */
-    private array $envSnapshot;
-
-    /** @var array<string, mixed> $_SERVER snapshot before each test. */
-    private array $serverSnapshot;
-
-    protected function setUp(): void
-    {
-        $this->fixturesDir = sys_get_temp_dir() . '/kariricode-dotenv-test-' . uniqid();
-        mkdir($this->fixturesDir, 0o755, true);
-
-        // Snapshot environment to restore in tearDown
-        $this->envSnapshot = $_ENV;
-        $this->serverSnapshot = $_SERVER;
-    }
-
-    protected function tearDown(): void
-    {
-        // Restore $_ENV and $_SERVER to pre-test state
-        $addedEnvKeys = array_diff_key($_ENV, $this->envSnapshot);
-        foreach ($addedEnvKeys as $key => $_) {
-            unset($_ENV[$key]);
-            putenv($key);
-        }
-
-        $addedServerKeys = array_diff_key($_SERVER, $this->serverSnapshot);
-        foreach ($addedServerKeys as $key => $_) {
-            unset($_SERVER[$key]);
-        }
-
-        // Restore any values that were overwritten
-        $_ENV = $this->envSnapshot;
-        $_SERVER = $this->serverSnapshot;
-
-        $this->removeDirectory($this->fixturesDir);
-    }
-
-    // ── Loading ───────────────────────────────────────────────────────
+    // ── Loading ──────────────────────────────────────────────────────────
 
     public function testLoadsEnvFile(): void
     {
@@ -120,13 +80,13 @@ final class DotenvIntegrationTest extends TestCase
         self::assertSame('Welcome to KaririCode', $dotenv->get('GREETING'));
     }
 
-    // ── Load Modes ────────────────────────────────────────────────────
+    // ── Load Modes ───────────────────────────────────────────────────────
 
     public function testSkipExistingMode(): void
     {
         $_ENV['IMMUTABLE_VAR'] = 'original';
 
-        $this->createEnvFile('.env', "IMMUTABLE_VAR=overwritten");
+        $this->createEnvFile('.env', 'IMMUTABLE_VAR=overwritten');
 
         $config = new DotenvConfiguration(loadMode: LoadMode::SkipExisting);
         $dotenv = new Dotenv($this->fixturesDir, $config);
@@ -139,7 +99,7 @@ final class DotenvIntegrationTest extends TestCase
     {
         $_ENV['IMMUTABLE_VAR'] = 'original';
 
-        $this->createEnvFile('.env', "IMMUTABLE_VAR=overwritten");
+        $this->createEnvFile('.env', 'IMMUTABLE_VAR=overwritten');
 
         $config = new DotenvConfiguration(loadMode: LoadMode::Overwrite);
         $dotenv = new Dotenv($this->fixturesDir, $config);
@@ -148,7 +108,7 @@ final class DotenvIntegrationTest extends TestCase
         self::assertSame('overwritten', $_ENV['IMMUTABLE_VAR']);
     }
 
-    // ── Validation ────────────────────────────────────────────────────
+    // ── Validation ───────────────────────────────────────────────────────
 
     public function testRequiredVariablesPass(): void
     {
@@ -176,7 +136,7 @@ final class DotenvIntegrationTest extends TestCase
         $dotenv->required('FOO', 'MISSING_VAR');
     }
 
-    // ── Error Handling ────────────────────────────────────────────────
+    // ── Error Handling ───────────────────────────────────────────────────
 
     public function testThrowsOnMissingFile(): void
     {
@@ -195,7 +155,7 @@ final class DotenvIntegrationTest extends TestCase
         self::assertSame([], $dotenv->variables());
     }
 
-    // ── Multiple Files ────────────────────────────────────────────────
+    // ── Multiple Files ───────────────────────────────────────────────────
 
     public function testLoadsMultipleFiles(): void
     {
@@ -210,7 +170,7 @@ final class DotenvIntegrationTest extends TestCase
         self::assertSame('override', $dotenv->get('BAR'));
     }
 
-    // ── Configuration ─────────────────────────────────────────────────
+    // ── Configuration ────────────────────────────────────────────────────
 
     public function testDisableTypeCasting(): void
     {
@@ -223,7 +183,7 @@ final class DotenvIntegrationTest extends TestCase
         self::assertSame('42', $dotenv->get('TEST_INT'));
     }
 
-    // ── Fluent Validation DSL ─────────────────────────────────────────
+    // ── Fluent Validation DSL ────────────────────────────────────────────
 
     public function testValidationDslPasses(): void
     {
@@ -236,8 +196,7 @@ final class DotenvIntegrationTest extends TestCase
             ADMIN_EMAIL=admin@example.com
             ENV);
 
-        $config = new DotenvConfiguration(loadMode: LoadMode::Overwrite);
-        $dotenv = new Dotenv($this->fixturesDir, $config);
+        $dotenv = new Dotenv($this->fixturesDir);
         $dotenv->load();
 
         $dotenv->validate()
@@ -260,8 +219,7 @@ final class DotenvIntegrationTest extends TestCase
             APP_ENV=wrong
             ENV);
 
-        $config = new DotenvConfiguration(loadMode: LoadMode::Overwrite);
-        $dotenv = new Dotenv($this->fixturesDir, $config);
+        $dotenv = new Dotenv($this->fixturesDir);
         $dotenv->load();
 
         try {
@@ -305,7 +263,7 @@ final class DotenvIntegrationTest extends TestCase
         self::assertTrue(true);
     }
 
-    // ── Encryption ────────────────────────────────────────────────────
+    // ── Encryption ───────────────────────────────────────────────────────
 
     public function testEncryptionRoundTrip(): void
     {
@@ -340,7 +298,7 @@ final class DotenvIntegrationTest extends TestCase
         self::assertSame('plaintext-value', $dotenv->get('FOO'));
     }
 
-    // ── Cache ─────────────────────────────────────────────────────────
+    // ── Cache ────────────────────────────────────────────────────────────
 
     public function testCacheDumpAndLoad(): void
     {
@@ -370,6 +328,7 @@ final class DotenvIntegrationTest extends TestCase
 
         self::assertSame('localhost', $dotenv2->get('DB_HOST'));
         self::assertSame(5432, $dotenv2->get('DB_PORT'));
+        self::assertSame('cache', $dotenv2->debug()['DB_HOST']['source']);
     }
 
     public function testCacheClear(): void
@@ -383,7 +342,7 @@ final class DotenvIntegrationTest extends TestCase
         self::assertFileDoesNotExist($cachePath);
     }
 
-    // ── Environment-Aware Loading (bootEnv) ───────────────────────────
+    // ── Environment-Aware Loading (bootEnv) ──────────────────────────────
 
     public function testBootEnvCascadeLoading(): void
     {
@@ -442,7 +401,7 @@ final class DotenvIntegrationTest extends TestCase
         self::assertSame('prod-host', $dotenv->get('DB_HOST'));
     }
 
-    // ── Allow/Deny List ───────────────────────────────────────────────
+    // ── Allow/Deny List ──────────────────────────────────────────────────
 
     public function testAllowListFilters(): void
     {
@@ -477,7 +436,7 @@ final class DotenvIntegrationTest extends TestCase
         self::assertNull($dotenv->get('SECRET'));
     }
 
-    // ── Processors ────────────────────────────────────────────────────
+    // ── Processors ───────────────────────────────────────────────────────
 
     public function testCsvProcessorSplitsValues(): void
     {
@@ -505,7 +464,7 @@ final class DotenvIntegrationTest extends TestCase
         self::assertSame('secret', $dotenv->get('API_KEY')); // Not affected
     }
 
-    // ── Schema Validation ─────────────────────────────────────────────
+    // ── Schema Validation ────────────────────────────────────────────────
 
     public function testSchemaValidationPasses(): void
     {
@@ -528,8 +487,7 @@ final class DotenvIntegrationTest extends TestCase
             allowed = local, staging, production
             SCHEMA);
 
-        $config = new DotenvConfiguration(loadMode: LoadMode::Overwrite);
-        $dotenv = new Dotenv($this->fixturesDir, $config);
+        $dotenv = new Dotenv($this->fixturesDir);
         $dotenv->loadWithSchema($schemaPath);
 
         self::assertTrue(true);
@@ -552,15 +510,14 @@ final class DotenvIntegrationTest extends TestCase
             allowed = local, staging, production
             SCHEMA);
 
-        $config = new DotenvConfiguration(loadMode: LoadMode::Overwrite);
-        $dotenv = new Dotenv($this->fixturesDir, $config);
+        $dotenv = new Dotenv($this->fixturesDir);
 
         $this->expectException(ValidationException::class);
 
         $dotenv->loadWithSchema($schemaPath);
     }
 
-    // ── Debug / Introspection ─────────────────────────────────────────
+    // ── Debug / Introspection ────────────────────────────────────────────
 
     public function testDebugReturnsSourceTracking(): void
     {
@@ -594,7 +551,7 @@ final class DotenvIntegrationTest extends TestCase
         self::assertSame('override', $debug['DB_HOST']['value']);
     }
 
-    // ── ${VAR:+alternate} Syntax ──────────────────────────────────────
+    // ── ${VAR:+alternate} Syntax ─────────────────────────────────────────
 
     public function testAlternateSyntaxInIntegration(): void
     {
@@ -603,39 +560,11 @@ final class DotenvIntegrationTest extends TestCase
         $dotenv = new Dotenv($this->fixturesDir);
         $dotenv->load();
 
-        // TypeSystem casts 'yes' → bool true; verify raw value also carried correctly
-        $vars = $dotenv->variables();
-        self::assertArrayHasKey('HAS_CACHE', $vars);
-        self::assertSame('yes', $vars['HAS_CACHE']->rawValue);
-        // The typed value 'yes' is cast to boolean true by TypeSystem
+        // "yes" is a boolean literal for the type system (SPEC-003 §3.2)
         self::assertTrue($dotenv->get('HAS_CACHE'));
+        self::assertSame('yes', $dotenv->variables()['HAS_CACHE']->rawValue);
     }
 
-    // ── Helpers ───────────────────────────────────────────────────────
+    // ── Helpers ──────────────────────────────────────────────────────────
 
-    private function createEnvFile(string $filename, string $content): void
-    {
-        file_put_contents(
-            $this->fixturesDir . '/' . $filename,
-            ltrim($content),
-        );
-    }
-
-    private function removeDirectory(string $dir): void
-    {
-        if (! is_dir($dir)) {
-            return;
-        }
-
-        $items = new \RecursiveIteratorIterator(
-            new \RecursiveDirectoryIterator($dir, \RecursiveDirectoryIterator::SKIP_DOTS),
-            \RecursiveIteratorIterator::CHILD_FIRST,
-        );
-
-        foreach ($items as $item) {
-            $item->isDir() ? rmdir($item->getPathname()) : unlink($item->getPathname());
-        }
-
-        rmdir($dir);
-    }
 }

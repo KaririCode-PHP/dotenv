@@ -1,8 +1,12 @@
 # ADR-006: Three Load Modes for Environment Variable Precedence
 
-**Status:** Accepted
-**Date:** 2024-01-20
-**Applies to:** KaririCode\Dotenv 4.0+
+| Field | Value |
+|---|---|
+| **Status** | Accepted |
+| **Introduced** | 4.0.0 |
+| **ARFA 1.3** | P1 (Immutable State Transformation) |
+| **Errata** | E-011 (`ImmutableException::alreadyDefined()`) |
+| **Date** | 2026-02-28 · revised 2026-09-29 (4.5.0) |
 
 ## Context
 
@@ -34,46 +38,51 @@ Always overwrites, regardless of prior state. The `.env` file is the absolute so
 
 ### `LoadMode::SkipExisting`
 
-Silently skips any variable that already exists in the environment. No exception, no overwrite.
+Silently skips a variable that was already in the process before this instance started loading. No exception, no overwrite. Later files of the same cascade still override earlier ones.
 
-**Use case:** Docker images that set sensible defaults in `.env` but allow runtime overrides via `docker run -e DB_HOST=...`. The `.env` provides fallbacks only.
+**Use case:** Container images that ship sensible defaults in `.env` but allow runtime overrides via `docker run -e DB_HOST=...`. The `.env` provides fallbacks only.
+
+**References follow the effective value.** Because the process value wins, `${NAME}` references resolve to it as well — `DSN="pgsql:host=${DB_HOST}"` uses the same host the application sees in `DB_HOST`, never the skipped file value.
 
 ### Decision Matrix
 
-| Scenario | Pre-existing var | .env var | Immutable | Overwrite | SkipExisting |
+| Scenario | Process | File(s) | Immutable | Overwrite | SkipExisting |
 |---|---|---|---|---|---|
-| Conflict | `DB_HOST=prod` | `DB_HOST=dev` | ❌ throws | `dev` wins | `prod` wins |
-| No conflict | *(absent)* | `DB_HOST=dev` | `dev` set | `dev` set | `dev` set |
-| Cascade | `.env`: `X=a` | `.env.local`: `X=b` | `b` wins | `b` wins | `b` wins |
+| Conflict | `DB_HOST=prod` | `.env`: `DB_HOST=dev` | ❌ `ImmutableException` | `dev` | `prod` |
+| No conflict | *(absent)* | `.env`: `DB_HOST=dev` | `dev` | `dev` | `dev` |
+| Cascade | *(absent)* | `.env`: `X=a`, `.env.local`: `X=b` | `b` | `b` | `b` |
+| Reference | `DB_HOST=prod` | `.env`: `DB_HOST=dev`, `DSN=${DB_HOST}` | ❌ throws | `DSN=dev` | `DSN=prod` |
 
 ### Implementation
 
-The check occurs in `Dotenv::setVariable()`:
+Both guarded modes share one definition of *pre-existing*, computed in `Dotenv::setVariable()`:
 
 ```php
-$alreadyExists = isset($_ENV[$name]) || isset($_SERVER[$name]) || getenv($name) !== false;
+// Pre-existing = present in the process before this instance loaded it.
+// Variables loaded by an earlier file of this instance are cascade overrides.
+$preExisting = !isset($this->variables[$name]) && $this->existsInProcess($name);
 
-if ($this->configuration->loadMode === LoadMode::Immutable
-    && $alreadyExists
-    && !isset($this->variables[$name])  // Not loaded by this instance
-) {
+if ($preExisting && $this->configuration->loadMode === LoadMode::Immutable) {
     throw ImmutableException::alreadyDefined($name);
 }
 
-if ($this->configuration->loadMode === LoadMode::SkipExisting && $alreadyExists) {
+if ($preExisting && $this->configuration->loadMode === LoadMode::SkipExisting) {
     return;
 }
 ```
 
-The `!isset($this->variables[$name])` guard is critical — it distinguishes between "existed before Dotenv" (immutable violation) and "loaded by a prior .env file in this instance" (cascade override, allowed).
+`existsInProcess()` checks `$_ENV`, `$_SERVER` and `getenv()`. For references, `Dotenv` passes the pre-existing values as `InterpolationContext::$locked` when the mode is `SkipExisting`, so the parser resolves them before same-file definitions (SPEC-002).
+
+**Defect fixed in 4.5.0:** in 4.4 the "not loaded by this instance" guard applied only to `Immutable`. Under `SkipExisting`, a value that `.env` had just written into `$_ENV` counted as pre-existing, so `.env.local` could not override `.env` — contradicting the matrix above — and references used the skipped file value.
 
 ## Consequences
 
 **Positive:**
 - Explicit control over precedence — no guessing which value is active.
 - Safe default (Immutable) prevents silent credential conflicts in production.
-- All three modes share the same code path — the only difference is the conflict resolution branch.
+- The same pre-existing rule drives all modes, so cascade overrides behave identically in each.
+- Under SkipExisting, derived values (DSNs, URLs) stay consistent with the variables they reference.
 
 **Negative:**
-- Immutable mode can cause startup failures if the deployment pipeline inadvertently sets variables that conflict with `.env`. This is by design — the failure surfaces the misconfiguration.
-- SkipExisting mode can silently mask stale `.env` values. Developers must understand that pre-existing environment variables always win.
+- Immutable mode can cause startup failures if the deployment pipeline sets variables that also appear in `.env`. This is by design — the failure surfaces the misconfiguration.
+- SkipExisting can hide stale `.env` values: pre-existing process variables always win.

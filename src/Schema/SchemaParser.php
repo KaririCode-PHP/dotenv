@@ -45,7 +45,7 @@ use KaririCode\Dotenv\Validation\EnvironmentValidator;
  * @package KaririCode\Dotenv
  * @since   4.4.0
  */
-final class SchemaParser
+final readonly class SchemaParser
 {
     /**
      * Parses a schema file and returns structured rules per variable.
@@ -69,18 +69,13 @@ final class SchemaParser
             if (preg_match('/^\[([A-Za-z_][A-Za-z0-9_]*)\]$/', $line, $matches)) {
                 $currentSection = $matches[1];
                 $schema[$currentSection] ??= [];
-
                 continue;
             }
 
             // Directive: key = value
-            if ($currentSection !== null && str_contains($line, '=')) {
-                $eqPos = strpos($line, '=');
+            $eqPos = strpos($line, '=');
 
-                if ($eqPos === false) {
-                    continue;
-                }
-
+            if ($currentSection !== null && $eqPos !== false) {
                 $key = trim(substr($line, 0, $eqPos));
                 $value = trim(substr($line, $eqPos + 1));
                 $schema[$currentSection][$key] = $value;
@@ -150,11 +145,13 @@ final class SchemaParser
         }
     }
 
-    /** @param array<string, string> $directives */
+    /**
+     * @param array<string, string> $directives
+     */
     private function boolDirective(array $directives, string $key): bool
     {
         $value = $directives[$key] ?? 'false';
 
-        return \in_array(strtolower($value), ['true', '1', 'yes', 'on'], true);
+        return in_array(strtolower($value), ['true', '1', 'yes', 'on'], true);
     }
 }

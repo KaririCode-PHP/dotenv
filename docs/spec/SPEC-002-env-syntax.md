@@ -1,8 +1,12 @@
-# SPEC-001: .env File Syntax
+# SPEC-002: .env File Syntax
 
-**Version:** 1.0
-**Date:** 2024-01-15
-**Applies to:** KaririCode\Dotenv 4.0+
+| Field | Value |
+|---|---|
+| **Version** | 4.5.0 |
+| **Introduced** | 4.0.0 |
+| **ARFA 1.3** | P4 (Protocol Agnosticism) |
+| **Errata** | — |
+| **Date** | 2026-02-28 · revised 2026-09-29 (4.5.0) |
 
 ## 1. Overview
 
@@ -119,7 +123,7 @@ FOO='hello\nworld'        # "hello\nworld" (literal backslash-n)
 | `\t` | Tab |
 | `\"` | Literal double quote |
 | `\\` | Literal backslash |
-| `\$` | Literal dollar sign (suppresses interpolation) |
+| `\$` | Literal dollar sign, never interpolated (see §6.6) |
 | `\x` (other) | Literal `\x` (unknown escapes pass through) |
 
 ### 5.5 Multiline Values
@@ -148,11 +152,15 @@ Interpolation is applied in **unquoted** and **double-quoted** values. Single-qu
 
 ### 6.1 Resolution Order
 
-Variables are resolved against:
-1. Already-parsed variables in the current file (top-to-bottom)
-2. `$_ENV`
-3. `$_SERVER`
-4. Empty string (if unresolved)
+A reference `NAME` resolves to the first match of:
+
+1. **Locked values** — under `LoadMode::SkipExisting`, a variable that already existed in the process: its effective value wins even over a definition in the same file (ADR-006).
+2. **Earlier lines of the same file** (top-to-bottom; later lines are not visible yet).
+3. **Earlier files of the same load** — e.g. `.env` when parsing `.env.local`. Works even with `populateEnv`/`populateServer` disabled.
+4. `$_ENV`, then `$_SERVER`.
+5. Unset — expands to `""` (or triggers `:-` / `:+`).
+
+A same-file reference to an `encrypted:` value receives the decrypted plaintext when a key is configured (SPEC-004 §7). These inputs are carried by `Core\InterpolationContext`; `DotenvParser::parse()` used on its own resolves only 2 and 4.
 
 ### 6.2 Brace Syntax
 
@@ -177,23 +185,30 @@ FOO=$BAR_BAZ              # Value of BAR_BAZ (underscores are part of the name)
 | `${BAR:-default}` | Value of BAR | `"default"` |
 | `${BAR:+alternate}` | `"alternate"` | `""` |
 
-### 6.5 Nesting Limitation
+### 6.5 Operands Are Literal
 
-Nested interpolation within operator operands is not supported:
-
-```ini
-# NOT supported:
-FOO=${BAR:-${BAZ}}        # The operand is the literal string "${BAZ}"
-```
-
-This matches the behavior of simple shell implementations. For complex defaults, use multiple lines:
+An operand is plain text: neither `${...}` nor `$NAME` inside it is expanded.
 
 ```ini
-BAZ_DEFAULT=fallback
-FOO=${BAR:-${BAZ_DEFAULT}}  # Still not supported; use:
-# BAZ=fallback
-# FOO=${BAR:-fallback}
+BAZ=fallback
+FOO=${BAR:-${BAZ}}        # "${BAZ}"  (BAR unset) — the operand ends at the first "}"
+FOO2=${BAR:-$BAZ}         # "$BAZ"
 ```
+
+For a default that comes from another variable, repeat its value: `FOO=${BAR:-fallback}`.
+
+### 6.6 Single-Pass Expansion
+
+Each value is expanded in one pass. Text produced by a substitution is never scanned again, so a value containing `$` is inserted verbatim:
+
+```ini
+PASSWORD='pa$word'
+DSN="user:${PASSWORD}@host"   # "user:pa$word@host"
+PRICE="costs \$5 or $5"       # "costs $5 or $5" — "\$" is literal; "$5" is not a reference
+TRAIL="\$HOME"                # "$HOME" — never expanded
+```
+
+A `$` not followed by `{NAME` or a letter/underscore is kept as-is. **Change in 4.5.0:** 4.4 expanded `${...}` and `$NAME` in two passes, so `DSN` above became `user:pa@host`, and `\$` was expanded anyway.
 
 ## 7. Inline Comments
 
@@ -230,5 +245,7 @@ double_quoted = '"' { DQ_CHAR | escape | interpolation } '"'
 single_quoted = "'" { SQ_CHAR } "'"
 unquoted    = { UQ_CHAR | interpolation } [ WS "#" TEXT ]
 escape      = "\" ( "n" | "r" | "t" | '"' | "\" | "$" | ANY )
-interpolation = "$" NAME | "${" NAME [ ( ":-" | ":+" ) OPERAND ] "}"
+interpolation = "$" REF_NAME | "${" REF_NAME [ ( ":-" | ":+" ) OPERAND ] "}"
+REF_NAME    = [A-Za-z_] [A-Za-z0-9_]*          (no dots: "$A.B" is "$A" followed by ".B")
+OPERAND     = { any character except "}" }     (literal text, §6.5)
 ```

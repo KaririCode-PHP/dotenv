@@ -1,8 +1,12 @@
-# SPEC-002: Type System
+# SPEC-003: Type System
 
-**Version:** 1.0
-**Date:** 2024-01-20
-**Applies to:** KaririCode\Dotenv 4.0+
+| Field | Value |
+|---|---|
+| **Version** | 4.5.0 |
+| **Introduced** | 4.0.0 |
+| **ARFA 1.3** | P1 (Immutable State) |
+| **Errata** | E-003, E-011 |
+| **Date** | 2026-02-28 · revised 2026-09-29 (4.5.0) |
 
 ## 1. Overview
 
@@ -104,11 +108,11 @@ Direct cast: `(float) $value`
 
 `json_decode($value, associative: true, depth: 512, flags: JSON_THROW_ON_ERROR)`
 
-Returns an associative array. Throws `\JsonException` on malformed input (fail-fast).
+Returns an associative array. Malformed JSON throws the native `\JsonException` (fail-fast); JSON that is valid but not an object or array (e.g. `"5"`) throws `ConversionException::jsonStructureExpected()`. After detection neither can happen — the guards matter when a caster is called directly.
 
 ### 4.6 JSON Array → `array`
 
-Same as JSON Object — `json_decode()` with `associative: true`.
+Same decoding. The result must be a list; anything else throws `ConversionException::jsonStructureExpected('JSON array')`.
 
 ### 4.7 String → `string`
 

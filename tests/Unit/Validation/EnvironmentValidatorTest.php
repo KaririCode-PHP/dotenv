@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace KaririCode\Dotenv\Tests\Unit\Validation;
 
+use KaririCode\Dotenv\Exception\ConfigurationException;
 use KaririCode\Dotenv\Exception\ValidationException;
 use KaririCode\Dotenv\Validation\EnvironmentValidator;
 use PHPUnit\Framework\TestCase;
@@ -17,7 +18,7 @@ final class EnvironmentValidatorTest extends TestCase
         );
     }
 
-    // ── Required ──────────────────────────────────────────────────────
+    // ── Required ─────────────────────────────────────────────────────────
 
     public function testRequiredPassesWhenPresent(): void
     {
@@ -50,7 +51,7 @@ final class EnvironmentValidatorTest extends TestCase
         }
     }
 
-    // ── NotEmpty ──────────────────────────────────────────────────────
+    // ── NotEmpty ─────────────────────────────────────────────────────────
 
     public function testNotEmptyPasses(): void
     {
@@ -68,7 +69,7 @@ final class EnvironmentValidatorTest extends TestCase
         $v->required('DB_HOST')->notEmpty()->assert();
     }
 
-    // ── IsInteger ─────────────────────────────────────────────────────
+    // ── IsInteger ────────────────────────────────────────────────────────
 
     public function testIsIntegerPasses(): void
     {
@@ -94,7 +95,7 @@ final class EnvironmentValidatorTest extends TestCase
         $this->assertTrue(true);
     }
 
-    // ── Between ───────────────────────────────────────────────────────
+    // ── Between ──────────────────────────────────────────────────────────
 
     public function testBetweenPasses(): void
     {
@@ -122,7 +123,7 @@ final class EnvironmentValidatorTest extends TestCase
         $v->required('PORT')->isInteger()->between(1, 65535)->assert();
     }
 
-    // ── IsBoolean ─────────────────────────────────────────────────────
+    // ── IsBoolean ────────────────────────────────────────────────────────
 
     public function testIsBooleanPassesForAllVariants(): void
     {
@@ -144,7 +145,7 @@ final class EnvironmentValidatorTest extends TestCase
         $v->required('DEBUG')->isBoolean()->assert();
     }
 
-    // ── AllowedValues ─────────────────────────────────────────────────
+    // ── AllowedValues ────────────────────────────────────────────────────
 
     public function testAllowedValuesPasses(): void
     {
@@ -163,7 +164,7 @@ final class EnvironmentValidatorTest extends TestCase
         $v->allowedValues('ENV', ['local', 'staging', 'production'])->assert();
     }
 
-    // ── MatchesRegex ──────────────────────────────────────────────────
+    // ── MatchesRegex ─────────────────────────────────────────────────────
 
     public function testMatchesRegexPasses(): void
     {
@@ -182,7 +183,7 @@ final class EnvironmentValidatorTest extends TestCase
         $v->matchesRegex('KEY', '/\A[a-f0-9]{32}\z/')->assert();
     }
 
-    // ── URL ───────────────────────────────────────────────────────────
+    // ── URL ──────────────────────────────────────────────────────────────
 
     public function testUrlPasses(): void
     {
@@ -201,7 +202,7 @@ final class EnvironmentValidatorTest extends TestCase
         $v->url('APP_URL')->assert();
     }
 
-    // ── Email ─────────────────────────────────────────────────────────
+    // ── Email ────────────────────────────────────────────────────────────
 
     public function testEmailPasses(): void
     {
@@ -220,7 +221,7 @@ final class EnvironmentValidatorTest extends TestCase
         $v->email('ADMIN')->assert();
     }
 
-    // ── Custom ────────────────────────────────────────────────────────
+    // ── Custom ───────────────────────────────────────────────────────────
 
     public function testCustomCallbackPasses(): void
     {
@@ -238,7 +239,7 @@ final class EnvironmentValidatorTest extends TestCase
         $v->custom('DSN', fn (string $v): bool => str_starts_with($v, 'pgsql:'), 'DSN must use pgsql driver.')->assert();
     }
 
-    // ── IfPresent (conditional) ───────────────────────────────────────
+    // ── IfPresent (conditional) ──────────────────────────────────────────
 
     public function testIfPresentSkipsMissingVariable(): void
     {
@@ -256,7 +257,7 @@ final class EnvironmentValidatorTest extends TestCase
         $v->ifPresent('REDIS_HOST')->notEmpty()->assert();
     }
 
-    // ── Batch Errors ──────────────────────────────────────────────────
+    // ── Batch Errors ─────────────────────────────────────────────────────
 
     public function testBatchCollectsAllErrors(): void
     {
@@ -277,7 +278,7 @@ final class EnvironmentValidatorTest extends TestCase
         }
     }
 
-    // ── IsNumeric ─────────────────────────────────────────────────────
+    // ── IsNumeric ────────────────────────────────────────────────────────
 
     public function testIsNumericPasses(): void
     {
@@ -296,5 +297,28 @@ final class EnvironmentValidatorTest extends TestCase
         $this->expectException(ValidationException::class);
 
         $v->required('N')->isNumeric()->assert();
+    }
+
+    // ── Regression ───────────────────────────────────────────────────────
+
+    public function testInvalidRegexIsAConfigurationErrorNotAWarning(): void
+    {
+        $validator = new EnvironmentValidator(static fn (string $name): ?string => 'value');
+
+        $this->expectException(ConfigurationException::class);
+
+        $validator->matchesRegex('API_KEY', '/unterminated');
+    }
+
+    public function testErrorsAreAvailableForEveryValidationFailureKind(): void
+    {
+        self::assertSame(
+            ['A is required but not defined.', 'B is required but not defined.'],
+            ValidationException::missingRequired(['A', 'B'])->errors(),
+        );
+        self::assertSame(
+            ['Unknown type "uuid" for ID.'],
+            ValidationException::schemaViolation('Unknown type "uuid" for ID.')->errors(),
+        );
     }
 }

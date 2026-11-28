@@ -12,7 +12,6 @@ use KaririCode\Dotenv\Contract\TypeCaster;
  */
 final readonly class FloatCaster implements TypeCaster
 {
-    #[\Override]
     public function cast(string $value): float
     {
         return (float) $value;

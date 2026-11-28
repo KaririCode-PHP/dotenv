@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace KaririCode\Dotenv\Tests\Unit\Core;
 
 use KaririCode\Dotenv\Core\DotenvParser;
+use KaririCode\Dotenv\Core\InterpolationContext;
 use KaririCode\Dotenv\Exception\ParseException;
 use PHPUnit\Framework\TestCase;
 
@@ -17,7 +18,7 @@ final class DotenvParserTest extends TestCase
         $this->parser = new DotenvParser();
     }
 
-    // ── Basic Parsing ─────────────────────────────────────────────────
+    // ── Basic Parsing ────────────────────────────────────────────────────
 
     public function testParsesSimpleKeyValue(): void
     {
@@ -54,7 +55,7 @@ final class DotenvParserTest extends TestCase
         self::assertSame(['FOO' => ''], $result);
     }
 
-    // ── Quoted Values ─────────────────────────────────────────────────
+    // ── Quoted Values ────────────────────────────────────────────────────
 
     public function testParsesDoubleQuotedValues(): void
     {
@@ -107,7 +108,7 @@ final class DotenvParserTest extends TestCase
         $this->parser->parse("FOO='unterminated");
     }
 
-    // ── Inline Comments ───────────────────────────────────────────────
+    // ── Inline Comments ──────────────────────────────────────────────────
 
     public function testStripsInlineComments(): void
     {
@@ -123,7 +124,7 @@ final class DotenvParserTest extends TestCase
         self::assertSame(['FOO' => 'bar # not a comment'], $result);
     }
 
-    // ── Variable Interpolation ────────────────────────────────────────
+    // ── Variable Interpolation ───────────────────────────────────────────
 
     public function testExpandsBraceVariables(): void
     {
@@ -191,7 +192,7 @@ final class DotenvParserTest extends TestCase
         self::assertSame(['FOO' => ''], $result);
     }
 
-    // ── Multiline Values ──────────────────────────────────────────────
+    // ── Multiline Values ─────────────────────────────────────────────────
 
     public function testMultilineDoubleQuotedValue(): void
     {
@@ -201,7 +202,7 @@ final class DotenvParserTest extends TestCase
         self::assertSame(['FOO' => "line1\nline2\nline3"], $result);
     }
 
-    // ── Strict Name Validation ────────────────────────────────────────
+    // ── Strict Name Validation ───────────────────────────────────────────
 
     public function testStrictNamesRejectsLowercase(): void
     {
@@ -225,7 +226,7 @@ final class DotenvParserTest extends TestCase
         self::assertSame(['foo_bar' => 'value'], $result);
     }
 
-    // ── Edge Cases ────────────────────────────────────────────────────
+    // ── Edge Cases ───────────────────────────────────────────────────────
 
     public function testEmptyContent(): void
     {
@@ -267,5 +268,68 @@ final class DotenvParserTest extends TestCase
         $result = $this->parser->parse('PRICE="\\$100"');
 
         self::assertSame(['PRICE' => '$100'], $result);
+    }
+
+    // ── Regression: Escaping & Single-Pass Expansion ─────────────────────
+
+    public function testEscapedDollarInDoubleQuotesIsNeverInterpolated(): void
+    {
+        $result = $this->parser->parse("HOME_DIR=/root\nPRICE=\"costs \\\$HOME_DIR\"");
+
+        self::assertSame('costs $HOME_DIR', $result['PRICE']);
+    }
+
+    public function testReferencedValueContainingDollarIsInsertedVerbatim(): void
+    {
+        $result = $this->parser->parse("PASSWORD='pa\$word'\nDSN=\"user:\${PASSWORD}@host\"");
+
+        self::assertSame('user:pa$word@host', $result['DSN']);
+    }
+
+    public function testDefaultOperandIsLiteralText(): void
+    {
+        $result = $this->parser->parse("HOME_DIR=/root\nA=\${UNSET_KC:-\$HOME_DIR}\nB=\${UNSET_KC:-\${HOME_DIR}}");
+
+        self::assertSame('$HOME_DIR', $result['A']);
+        self::assertSame('${HOME_DIR}', $result['B']);
+    }
+
+    public function testContentContainingThePlaceholderTokenIsSafe(): void
+    {
+        $result = $this->parser->parse("RAW='\0kc-dollar\0'\nA=\"p\\\$q\"");
+
+        self::assertSame("\0kc-dollar\0", $result['RAW']);
+        self::assertSame('p$q', $result['A']);
+    }
+
+    // ── Interpolation Context ────────────────────────────────────────────
+
+    public function testLockedValuesWinOverSameFileDefinitions(): void
+    {
+        $context = new InterpolationContext(locked: ['DB_HOST' => 'real-host']);
+
+        $result = $this->parser->parse("DB_HOST=file-host\nDSN=pgsql:host=\${DB_HOST}", context: $context);
+
+        self::assertSame('file-host', $result['DB_HOST']);
+        self::assertSame('pgsql:host=real-host', $result['DSN']);
+    }
+
+    public function testInheritedValuesAreVisibleButSameFileWins(): void
+    {
+        $context = new InterpolationContext(inherited: ['APP_NAME' => 'Kariri', 'REGION' => 'eu']);
+
+        $result = $this->parser->parse("REGION=us\nLABEL=\"\${APP_NAME}-\${REGION}\"", context: $context);
+
+        self::assertSame('Kariri-us', $result['LABEL']);
+    }
+
+    public function testValueFilterAppliesToSameFileReferencesOnly(): void
+    {
+        $context = new InterpolationContext(valueFilter: static fn (string $v): string => strtoupper($v));
+
+        $result = $this->parser->parse("SECRET=abc\nURL=\"x:\${SECRET}\"", context: $context);
+
+        self::assertSame('abc', $result['SECRET']);
+        self::assertSame('x:ABC', $result['URL']);
     }
 }

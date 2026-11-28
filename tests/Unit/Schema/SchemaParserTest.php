@@ -18,7 +18,7 @@ final class SchemaParserTest extends TestCase
         $this->parser = new SchemaParser();
     }
 
-    // ── Parsing ───────────────────────────────────────────────────────
+    // ── Parsing ──────────────────────────────────────────────────────────
 
     public function testParsesBasicSchema(): void
     {
@@ -88,7 +88,7 @@ final class SchemaParserTest extends TestCase
         self::assertSame('/^[a-f0-9]{32}$/', $schema['API_KEY']['regex']);
     }
 
-    // ── Validator Application ─────────────────────────────────────────
+    // ── Validator Application ────────────────────────────────────────────
 
     public function testApplyToValidatorPassesWithValidData(): void
     {

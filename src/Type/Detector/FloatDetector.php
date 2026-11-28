@@ -15,13 +15,11 @@ use KaririCode\Dotenv\Enum\ValueType;
  */
 final readonly class FloatDetector implements TypeDetector
 {
-    #[\Override]
     public function priority(): int
     {
         return 170;
     }
 
-    #[\Override]
     public function detect(string $value): ?ValueType
     {
         if ($value === '') {
@@ -29,7 +27,7 @@ final readonly class FloatDetector implements TypeDetector
         }
 
         // Must contain a dot or exponent marker to be float (not integer)
-        if (! str_contains($value, '.') && ! str_contains(strtolower($value), 'e')) {
+        if (!str_contains($value, '.') && !str_contains(strtolower($value), 'e')) {
             return null;
         }
 

@@ -20,7 +20,7 @@ use KaririCode\Dotenv\Validation\Rule\UrlRule;
 /**
  * Fluent validation DSL for environment variables.
  *
- * Collects all failures before throwing, unlike vlucas which stops at the first.
+ * Collects all failures before throwing, rather than stopping at the first.
  * Supports conditional validation via ifPresent() and custom callbacks.
  *
  * ```php
@@ -48,9 +48,6 @@ final class EnvironmentValidator
     /** @var list<string> Current target variable names for fluent chaining. */
     private array $currentTargets = [];
 
-    /** @var bool When true, rules only apply if the variable exists. */
-    private bool $conditionalMode = false;
-
     /**
      * @param \Closure(string): ?string $valueResolver Returns raw value or null if not set.
      */
@@ -59,7 +56,7 @@ final class EnvironmentValidator
     ) {
     }
 
-    // ── Targeting ─────────────────────────────────────────────────────
+    // ── Targeting ────────────────────────────────────────────────────────
 
     /**
      * Declares variables that must exist (non-null). Does not apply rules to them
@@ -67,26 +64,26 @@ final class EnvironmentValidator
      */
     public function required(string ...$names): self
     {
-        $this->requiredNames = array_values(array_merge($this->requiredNames, $names));
-        $this->currentTargets = array_values($names);
-        $this->conditionalMode = false;
+        $names = array_values($names);
+        $this->requiredNames = array_merge($this->requiredNames, $names);
+        $this->currentTargets = $names;
 
         return $this;
     }
 
     /**
-     * Targets variables for rule application. If a variable is absent,
-     * validation for it is silently skipped.
+     * Targets optional variables. Rules only ever run against variables
+     * that are present, so this is the explicit, self-documenting way to
+     * validate something optional ("if REDIS_HOST is set, it must not be empty").
      */
     public function ifPresent(string ...$names): self
     {
         $this->currentTargets = array_values($names);
-        $this->conditionalMode = true;
 
         return $this;
     }
 
-    // ── Built-in Rules ────────────────────────────────────────────────
+    // ── Built-in Rules ───────────────────────────────────────────────────
 
     public function notEmpty(string ...$names): self
     {
@@ -118,13 +115,13 @@ final class EnvironmentValidator
     }
 
     /**
-     * @param list<string> $allowed Accepted values for this variable.
+     * @param list<string> $allowed
      */
     public function allowedValues(string $name, array $allowed): self
     {
         $this->currentTargets = [$name];
 
-        return $this->applyRule(new AllowedValuesRule($allowed), []);
+        return $this->applyRule(new AllowedValuesRule(array_values($allowed)), []);
     }
 
     public function matchesRegex(string $name, string $pattern): self
@@ -163,7 +160,7 @@ final class EnvironmentValidator
         return $this->applyRule($rule, array_values($names));
     }
 
-    // ── Execution ─────────────────────────────────────────────────────
+    // ── Execution ────────────────────────────────────────────────────────
 
     /**
      * Runs all collected rules and throws with ALL failures if any exist.
@@ -174,42 +171,23 @@ final class EnvironmentValidator
     {
         $errors = [];
 
-        // Check required presence first
-        $missingRequired = [];
         foreach (array_unique($this->requiredNames) as $name) {
-            $value = ($this->valueResolver)($name);
-            if ($value === null) {
-                $missingRequired[] = $name;
-            }
-        }
-
-        if ($missingRequired !== []) {
-            foreach ($missingRequired as $name) {
+            if (($this->valueResolver)($name) === null) {
                 $errors[] = "{$name} is required but not defined.";
             }
         }
 
-        // Run rules per variable
+        // Rules only run against present values. An absent required variable
+        // is already reported above; an absent optional one is not an error.
         foreach ($this->rules as $name => $ruleList) {
             $value = ($this->valueResolver)($name);
 
-            // Skip absent variables in conditional mode
             if ($value === null) {
-                if ($this->isConditional($name)) {
-                    continue;
-                }
-
-                // Already reported as missing-required above, don't run rules
-                if (\in_array($name, $this->requiredNames, true)) {
-                    continue;
-                }
-
-                // Not required, not conditional — skip silently
                 continue;
             }
 
             foreach ($ruleList as $rule) {
-                if (! $rule->passes($value)) {
+                if (!$rule->passes($value)) {
                     $errors[] = str_replace('{name}', $name, $rule->message());
                 }
             }
@@ -220,15 +198,7 @@ final class EnvironmentValidator
         }
     }
 
-    // ── Internal ──────────────────────────────────────────────────────
-
-    /** @var array<string, true> Variables registered via ifPresent(). */
-    private array $conditionalNames = [];
-
-    private function isConditional(string $name): bool
-    {
-        return isset($this->conditionalNames[$name]);
-    }
+    // ── Internal ─────────────────────────────────────────────────────────
 
     /**
      * @param list<string> $explicitNames Override current targets when non-empty.
@@ -239,12 +209,6 @@ final class EnvironmentValidator
 
         if ($explicitNames !== []) {
             $this->currentTargets = $explicitNames;
-        }
-
-        if ($this->conditionalMode) {
-            foreach ($targets as $name) {
-                $this->conditionalNames[$name] = true;
-            }
         }
 
         foreach ($targets as $name) {

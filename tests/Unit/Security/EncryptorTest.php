@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace KaririCode\Dotenv\Tests\Unit\Security;
 
+use KaririCode\Dotenv\Exception\EncryptionException;
 use KaririCode\Dotenv\Security\Encryptor;
 use PHPUnit\Framework\TestCase;
 
@@ -74,7 +75,7 @@ final class EncryptorTest extends TestCase
         $wrongKey = bin2hex(random_bytes(32));
         $encryptor2 = new Encryptor($wrongKey);
 
-        $this->expectException(\RuntimeException::class);
+        $this->expectException(EncryptionException::class);
         $this->expectExceptionMessage('Decryption failed');
 
         $encryptor2->decrypt($encrypted);
@@ -84,15 +85,15 @@ final class EncryptorTest extends TestCase
     {
         $encryptor = new Encryptor($this->hexKey);
 
-        $this->expectException(\RuntimeException::class);
+        $this->expectException(EncryptionException::class);
 
         $encryptor->decrypt('encrypted:' . base64_encode('short'));
     }
 
     public function testInvalidKeyLengthThrows(): void
     {
-        $this->expectException(\InvalidArgumentException::class);
-        $this->expectExceptionMessage('32 bytes');
+        $this->expectException(EncryptionException::class);
+        $this->expectExceptionMessage('256-bit');
 
         new Encryptor('too-short');
     }
