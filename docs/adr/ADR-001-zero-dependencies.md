@@ -2,7 +2,7 @@
 
 | Field | Value |
 |---|---|
-| **Status** | Accepted |
+| **Status** | Accepted; amended by ADR-010 (4.5.0) |
 | **Introduced** | 4.0.0 |
 | **ARFA 1.3** | P4 (Protocol Agnosticism) |
 | **Errata** | E-012 |
@@ -45,3 +45,13 @@ Development dependencies (PHPUnit, PHPStan, PHP-CS-Fixer) are in `require-dev` o
 **Mitigations:**
 - ext-openssl is listed in `suggest` rather than `require` — encryption is opt-in.
 - The `VariableProcessor` contract allows application-level extensions without modifying the package.
+
+## Amendment (ADR-010, 4.5.0)
+
+The package now requires `kariricode/contract` and `kariricode/exception`,
+the two packages KaririCode Specification V4.3.3 §31 allows every
+component: interfaces, the exception family bases and the code table
+contract. Neither has a runtime dependency beyond PHP, so the reasons above
+still hold: no third-party code, no transitive advisories, and a loader
+that runs before any container. Development tools no longer live in
+`require-dev` at all; kcode installs them into `.kcode/` (ADR-009).

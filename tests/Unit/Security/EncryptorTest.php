@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace KaririCode\Dotenv\Tests\Unit\Security;
 
+use KaririCode\Dotenv\Exception\ConfigurationException;
 use KaririCode\Dotenv\Exception\EncryptionException;
 use KaririCode\Dotenv\Security\Encryptor;
 use PHPUnit\Framework\TestCase;
@@ -92,7 +93,7 @@ final class EncryptorTest extends TestCase
 
     public function testInvalidKeyLengthThrows(): void
     {
-        $this->expectException(EncryptionException::class);
+        $this->expectException(ConfigurationException::class);
         $this->expectExceptionMessage('256-bit');
 
         new Encryptor('too-short');

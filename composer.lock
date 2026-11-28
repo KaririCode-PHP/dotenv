@@ -4,8 +4,136 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "eff1056b23d0ceb7b0882a9076c3e445",
-    "packages": [],
+    "content-hash": "2ae6e95ea95acd444b9f0c34a3e6c638",
+    "packages": [
+        {
+            "name": "kariricode/contract",
+            "version": "v2.12.1",
+            "source": {
+                "type": "git",
+                "url": "https://github.com/KaririCode-PHP/contract.git",
+                "reference": "6ba79c820f810c451856bee67dabc5443f0782a5"
+            },
+            "dist": {
+                "type": "zip",
+                "url": "https://api.github.com/repos/KaririCode-PHP/contract/zipball/6ba79c820f810c451856bee67dabc5443f0782a5",
+                "reference": "6ba79c820f810c451856bee67dabc5443f0782a5",
+                "shasum": ""
+            },
+            "require": {
+                "php": "^8.4"
+            },
+            "type": "library",
+            "extra": {
+                "arfa": {
+                    "level": 1,
+                    "version": "1.3"
+                },
+                "asvs": {
+                    "level": 1,
+                    "version": "5.0"
+                },
+                "branch-alias": {
+                    "dev-main": "2.x-dev"
+                }
+            },
+            "autoload": {
+                "psr-4": {
+                    "KaririCode\\Contract\\": "src/"
+                }
+            },
+            "notification-url": "https://packagist.org/downloads/",
+            "license": [
+                "MIT"
+            ],
+            "authors": [
+                {
+                    "name": "Walmir Silva",
+                    "email": "walmir.silva@kariricode.org"
+                }
+            ],
+            "description": "Interfaces shared by KaririCode Framework components, so that components depend on contracts instead of on each other. Interfaces only; no runtime dependency beyond PHP.",
+            "homepage": "https://kariricode.org/",
+            "keywords": [
+                "KaririCode",
+                "PSRs",
+                "arfa",
+                "contract",
+                "framework",
+                "interface",
+                "kariri",
+                "php"
+            ],
+            "support": {
+                "issues": "https://github.com/KaririCode-Framework/kariricode-contract/issues",
+                "source": "https://github.com/KaririCode-Framework/kariricode-contract"
+            },
+            "time": "2026-11-27T12:43:04+00:00"
+        },
+        {
+            "name": "kariricode/exception",
+            "version": "v2.0.2",
+            "source": {
+                "type": "git",
+                "url": "https://github.com/KaririCode-PHP/exception.git",
+                "reference": "052cebd56000b539b8a56262db7cb6516124e858"
+            },
+            "dist": {
+                "type": "zip",
+                "url": "https://api.github.com/repos/KaririCode-PHP/exception/zipball/052cebd56000b539b8a56262db7cb6516124e858",
+                "reference": "052cebd56000b539b8a56262db7cb6516124e858",
+                "shasum": ""
+            },
+            "require": {
+                "kariricode/contract": "^2.11",
+                "php": "^8.4"
+            },
+            "type": "library",
+            "extra": {
+                "arfa": {
+                    "level": 1,
+                    "version": "1.3"
+                },
+                "asvs": {
+                    "level": 1,
+                    "version": "5.0"
+                },
+                "branch-alias": {
+                    "dev-main": "2.x-dev"
+                }
+            },
+            "autoload": {
+                "psr-4": {
+                    "KaririCode\\Exception\\": "src/"
+                }
+            },
+            "notification-url": "https://packagist.org/downloads/",
+            "license": [
+                "MIT"
+            ],
+            "authors": [
+                {
+                    "name": "Walmir Silva",
+                    "email": "walmir.silva@kariricode.org"
+                }
+            ],
+            "description": "Optional base classes for the exception families of kariricode/contract: one abstract base per family, error codes as int-backed enums inside registered blocks, and messages that are safe to log.",
+            "homepage": "https://kariricode.org/",
+            "keywords": [
+                "KaririCode",
+                "arfa",
+                "contract",
+                "error-codes",
+                "exception",
+                "php84"
+            ],
+            "support": {
+                "issues": "https://github.com/KaririCode-PHP/exception/issues",
+                "source": "https://github.com/KaririCode-PHP/exception"
+            },
+            "time": "2026-11-27T15:11:21+00:00"
+        }
+    ],
     "packages-dev": [],
     "aliases": [],
     "minimum-stability": "stable",

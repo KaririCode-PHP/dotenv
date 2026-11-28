@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace KaririCode\Dotenv\Tests\Unit\Security;
 
-use KaririCode\Dotenv\Exception\EncryptionException;
+use KaririCode\Dotenv\Exception\ConfigurationException;
 use KaririCode\Dotenv\Security\KeyPair;
 use PHPUnit\Framework\TestCase;
 
@@ -38,14 +38,14 @@ final class KeyPairTest extends TestCase
 
     public function testFromPrivateKeyRejectsInvalidLength(): void
     {
-        $this->expectException(EncryptionException::class);
+        $this->expectException(ConfigurationException::class);
 
         KeyPair::fromPrivateKey('abcdef');
     }
 
     public function testFromPrivateKeyRejectsNonHex(): void
     {
-        $this->expectException(EncryptionException::class);
+        $this->expectException(ConfigurationException::class);
 
         KeyPair::fromPrivateKey(str_repeat('g', 64));
     }

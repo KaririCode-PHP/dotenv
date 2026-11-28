@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace KaririCode\Dotenv\Security;
 
+use KaririCode\Dotenv\Exception\ConfigurationException;
 use KaririCode\Dotenv\Exception\EncryptionException;
 
 /**
@@ -32,7 +33,7 @@ final readonly class Encryptor
     /**
      * @param string $key 64-char hex string (256-bit key) or 32 raw bytes.
      *
-     * @throws EncryptionException When the key is not 256 bits.
+     * @throws ConfigurationException When the key is not 256 bits.
      */
     public function __construct(string $key)
     {
@@ -41,7 +42,7 @@ final readonly class Encryptor
         }
 
         if (strlen($key) !== self::KEY_LENGTH) {
-            throw EncryptionException::invalidKey();
+            throw ConfigurationException::invalidEncryptionKey();
         }
 
         $this->key = $key;

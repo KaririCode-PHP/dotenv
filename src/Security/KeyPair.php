@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace KaririCode\Dotenv\Security;
 
-use KaririCode\Dotenv\Exception\EncryptionException;
+use KaririCode\Dotenv\Exception\ConfigurationException;
 
 /**
  * A 256-bit encryption key plus a short, non-secret identifier.
@@ -32,12 +32,12 @@ final readonly class KeyPair
     }
 
     /**
-     * @throws EncryptionException When the key is not 64 hex characters.
+     * @throws ConfigurationException When the key is not 64 hex characters.
      */
     public static function fromPrivateKey(string $privateKey): self
     {
         if (preg_match('/\A[0-9a-fA-F]{64}\z/', $privateKey) !== 1) {
-            throw EncryptionException::invalidPrivateKey();
+            throw ConfigurationException::invalidPrivateKey();
         }
 
         return new self($privateKey, self::deriveId((string) hex2bin($privateKey)));

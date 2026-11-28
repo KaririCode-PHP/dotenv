@@ -101,24 +101,22 @@ None. Derived values are methods (`EnvEntry::isAssignment()`).
 
 ---
 
-## 5. Exception Model (E-006, E-011)
+## 5. Exception Model (E-006, E-011, ADR-010)
 
-Every exception extends the abstract `DotenvException` (itself a `RuntimeException`), so `catch (DotenvException $e)` covers the library. All are created through named factories.
+Every exception implements the marker interface `DotenvException`, so `catch (DotenvException $e)` covers the library, and extends the kariricode/exception base of exactly one kariricode/contract family. All are created through named factories, and each carries an `EnvCode` case in `$errorCode` (block 2700–2799, prefix `ENV`); `getCode()` returns its integer and the message starts with `[ENV_<code>]`.
 
-| Class | Factories | Raised by |
-|---|---|---|
-| `FileNotFoundException` | `forPath()` | missing `.env` / schema / CLI input |
-| `ParseException` | `invalidVariableName()`, `unterminatedQuote()` | parser |
-| `ImmutableException` | `alreadyDefined()` | Immutable load mode |
-| `ValidationException` | `missingRequired()`, `batchErrors()`, `schemaViolation()`; `errors()` always lists every message | validation, schema |
-| `EncryptionException` | `invalidKey()`, `invalidPrivateKey()`, `encryptionFailed()`, `malformedPayload()`, `decryptionFailed()` | Encryptor, KeyPair |
-| `CacheException` | `writeFailed()`, `notLoaded()` | PhpFileCache, `dumpCache()` |
-| `ConversionException` | `invalidBase64()`, `jsonStructureExpected()` | casters, processors |
-| `ConfigurationException` | `invalidEnvironmentName()`, `emptySeparator()`, `invalidRegexPattern()`, `invalidOption()` | invalid arguments |
+| Class (family) | Factories | Codes | Raised by |
+|---|---|---|---|
+| `ParseException` (Validation) | `invalidVariableName()`, `unterminatedQuote()` | 2700–2701 | parser |
+| `FileNotFoundException` (NotFound) | `forPath()` | 2710 | missing `.env` / schema / CLI input |
+| `ImmutableException` (Runtime) | `alreadyDefined()` | 2711 | Immutable load mode |
+| `ConfigurationException` (Configuration) | `invalidEnvironmentName()`, `emptySeparator()`, `invalidOption()`, `invalidRegexPattern()`, `invalidEncryptionKey()`, `invalidPrivateKey()` | 2720–2725 | invalid arguments and keys |
+| `ValidationException` (Validation) | `missingRequired()`, `batchErrors()`, `schemaViolation()`; `errors()` always lists every message | 2730–2732 | validation, schema |
+| `ConversionException` (Validation) | `invalidBase64()`, `jsonStructureExpected()` | 2740–2741 | casters, processors |
+| `EncryptionException` (Runtime) | `encryptionFailed()`, `malformedPayload()`, `decryptionFailed()` | 2750–2752 | Encryptor, EnvFileCipher |
+| `CacheException` (Runtime) | `writeFailed()`, `notLoaded()` | 2760–2761 | PhpFileCache, `dumpCache()` |
 
-Messages never contain key material or decrypted values. `\JsonException` from malformed JSON is left unwrapped (fail-fast, native type).
-
-**Numeric error codes:** not assigned. Dotenv does not depend on `kariricode/contract`, so exceptions are identified by class.
+Messages never contain key material, payloads or decrypted values; paths and names are quoted, and control characters are escaped, so a crafted name cannot forge a log line. `\JsonException` from malformed JSON is left unwrapped (fail-fast, native type).
 
 ---
 

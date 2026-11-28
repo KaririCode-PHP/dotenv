@@ -53,7 +53,7 @@ final class CliTest extends IntegrationTestCase
 
         self::assertSame(1, $code);
         self::assertSame('', $out);
-        self::assertSame("✗ Decryption failed — wrong key or corrupted payload.\n", $err);
+        self::assertSame("✗ [ENV_2752] Decryption failed — wrong key or corrupted payload.\n", $err);
     }
 
     public function testExampleGenerateNeverCopiesMultilineBodies(): void

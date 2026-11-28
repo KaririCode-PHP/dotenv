@@ -29,7 +29,9 @@
         "bin/kariricode-dotenv"
     ],
     "require": {
-        "php": "^8.4"
+        "php": "^8.4",
+        "kariricode/contract": "^2.11",
+        "kariricode/exception": "^2.0.2"
     },
     "suggest": {
         "ext-openssl": "Required for encrypted .env values (AES-256-GCM)"
@@ -93,7 +95,8 @@
                 "version": "5.0",
                 "level": 2
             },
-            "spec": "4.3.3"
+            "spec": "4.3.3",
+            "error-code-range": "ENV 2700–2799"
         },
         "branch-alias": {
             "dev-main": "4.x-dev"

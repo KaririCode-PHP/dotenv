@@ -5,6 +5,14 @@ declare(strict_types=1);
 namespace KaririCode\Dotenv\Tests\Conformance;
 
 use JsonException;
+use KaririCode\Contract\Exception\Configuration;
+use KaririCode\Contract\Exception\ContainerFailure;
+use KaririCode\Contract\Exception\NotFound;
+use KaririCode\Contract\Exception\Protocol;
+use KaririCode\Contract\Exception\Runtime;
+use KaririCode\Contract\Exception\Validation;
+use KaririCode\Dotenv\Exception\DotenvException;
+use KaririCode\Dotenv\Exception\EnvCode;
 use PhpToken;
 use PHPUnit\Framework\Attributes\CoversNothing;
 use PHPUnit\Framework\Attributes\Test;
@@ -24,6 +32,24 @@ final class ArfaConformanceTest extends TestCase
 
     /** The one file of functions: the global `env()` helper, loaded by Composer's `files` autoload. */
     private const string FUNCTIONS_FILE = 'env.php';
+
+    private const int ERROR_CODE_MIN = 2700;
+
+    private const int ERROR_CODE_MAX = 2799;
+
+    private const array FAMILIES = [Validation::class, NotFound::class, Configuration::class, Protocol::class, ContainerFailure::class, Runtime::class];
+
+    /** The concrete exceptions of the package, each built by named constructors only. */
+    private const array EXCEPTIONS = [
+        'CacheException',
+        'ConfigurationException',
+        'ConversionException',
+        'EncryptionException',
+        'FileNotFoundException',
+        'ImmutableException',
+        'ParseException',
+        'ValidationException',
+    ];
 
     /** The eight gates of Spec V4.3.3 §29.1. */
     private const array QUALITY_GATES = ['test', 'test-conformance', 'phpstan', 'psalm', 'cs-check', 'complexity', 'mutation', 'security'];
@@ -214,22 +240,27 @@ final class ArfaConformanceTest extends TestCase
         self::assertSame(4, $checked);
     }
 
-    /** ARFA 1.3 E-003: no enum of the package needs a backing value. */
+    /** ARFA 1.3 E-003: only the code table is backed, because getCode() reads its integer. */
     #[Test]
-    public function enumsArePure(): void
+    public function enumsArePureUnlessAnExternalContractNeedsABackingType(): void
     {
         $checked = 0;
 
         foreach (self::sourceFiles() as $relative => $code) {
             $name = self::reflect($relative)->getName();
 
-            if (enum_exists($name) && !str_starts_with($relative, 'Exception/')) {
+            if (enum_exists($name)) {
                 ++$checked;
-                self::assertFalse((new \ReflectionEnum($name))->isBacked(), $relative . ': E-003');
+                $backed = $relative === 'Exception/EnvCode.php';
+                self::assertSame($backed, (new \ReflectionEnum($name))->isBacked(), $relative . ': E-003');
+
+                if ($backed) {
+                    self::assertStringContainsString('E-003', $code, $relative . ': the justification is written down');
+                }
             }
         }
 
-        self::assertSame(2, $checked);
+        self::assertSame(3, $checked);
     }
 
     #[Test]
@@ -249,6 +280,64 @@ final class ArfaConformanceTest extends TestCase
         }
     }
 
+    // ── Errors ───────────────────────────────────────────────────────────
+
+    #[Test]
+    public function errorCodesAreUniqueAndInsideTheReservedBlock(): void
+    {
+        $codes = [];
+
+        foreach (EnvCode::cases() as $case) {
+            self::assertGreaterThanOrEqual(self::ERROR_CODE_MIN, $case->value);
+            self::assertLessThanOrEqual(self::ERROR_CODE_MAX, $case->value);
+            $codes[$case->value] = $case->name;
+        }
+
+        self::assertCount(20, $codes);
+        self::assertSame('ENV', EnvCode::prefix());
+        self::assertSame([self::ERROR_CODE_MIN, self::ERROR_CODE_MAX], [EnvCode::block()->first, EnvCode::block()->last]);
+    }
+
+    #[Test]
+    public function exceptionsAreBuiltOnlyByTheirNamedConstructors(): void
+    {
+        foreach ([...self::sourceFiles(), 'bin/kariricode-dotenv' => self::document('bin/kariricode-dotenv')] as $relative => $code) {
+            foreach (self::EXCEPTIONS as $exception) {
+                if ($relative === 'Exception/' . $exception . '.php') {
+                    continue;
+                }
+
+                self::assertDoesNotMatchRegularExpression('/\bnew\s+' . $exception . '\s*\(/', $code, $relative . ' builds ' . $exception . ' directly');
+            }
+
+            self::assertDoesNotMatchRegularExpression('/\bthrow\s+new\s+\\?[A-Za-z]*(Exception|Error)\b/', $code, $relative . ': throws an uncoded exception');
+        }
+    }
+
+    #[Test]
+    public function everyConcreteExceptionBelongsToExactlyOneContractFamilyAndThePackage(): void
+    {
+        $checked = 0;
+
+        foreach (self::sourceFiles() as $relative => $code) {
+            $type = self::reflect($relative);
+
+            if (!str_starts_with($relative, 'Exception/') || $type->isAbstract() || $type->isEnum() || $type->isInterface()) {
+                continue;
+            }
+
+            ++$checked;
+            $families = array_filter(self::FAMILIES, static fn(string $family): bool => $type->implementsInterface($family));
+            self::assertCount(1, $families, $relative);
+            self::assertTrue($type->implementsInterface(DotenvException::class), $relative);
+            $parent = $type->getParentClass();
+            self::assertNotFalse($parent, $relative);
+            self::assertStringStartsWith('KaririCode\\Exception\\', $parent->getName(), $relative . ': built on a kariricode/exception base');
+        }
+
+        self::assertSame(count(self::EXCEPTIONS), $checked);
+    }
+
     // ── Package metadata and supply chain ────────────────────────────────
 
     #[Test]
@@ -257,10 +346,17 @@ final class ArfaConformanceTest extends TestCase
         $composer = self::composer();
 
         self::assertSame(
-            ['arfa' => ['version' => '1.3', 'level' => 1], 'asvs' => ['version' => '5.0', 'level' => 2], 'spec' => '4.3.3'],
+            ['arfa' => ['version' => '1.3', 'level' => 1], 'asvs' => ['version' => '5.0', 'level' => 2], 'spec' => '4.3.3', 'error-code-range' => 'ENV 2700–2799'],
             self::at($composer, 'extra', 'kariricode'),
             'Spec V4.3.3 E-044 and gate G4',
         );
+
+        self::assertSame('^2.11', self::at($composer, 'require', 'kariricode/contract'));
+        self::assertSame('^2.0.2', self::at($composer, 'require', 'kariricode/exception'));
+
+        // Spec V4.3.3 §31: PHP, kariricode/contract, kariricode/exception and PSR interfaces only.
+        $runtime = array_keys((array) self::at($composer, 'require'));
+        self::assertSame([], array_values(array_filter($runtime, static fn(string $package): bool => preg_match('#\A(php|psr/[a-z-]+|kariricode/(contract|exception))\z#', $package) !== 1)));
 
         foreach (['require', 'require-dev', 'suggest'] as $section) {
             self::assertNull(self::at($composer, $section, 'kariricode/framework'), $section);
