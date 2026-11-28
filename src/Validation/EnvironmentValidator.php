@@ -53,8 +53,7 @@ final class EnvironmentValidator
      */
     public function __construct(
         private readonly \Closure $valueResolver,
-    ) {
-    }
+    ) {}
 
     // ── Targeting ────────────────────────────────────────────────────────
 
@@ -121,7 +120,7 @@ final class EnvironmentValidator
     {
         $this->currentTargets = [$name];
 
-        return $this->applyRule(new AllowedValuesRule(array_values($allowed)), []);
+        return $this->applyRule(new AllowedValuesRule($allowed), []);
     }
 
     public function matchesRegex(string $name, string $pattern): self

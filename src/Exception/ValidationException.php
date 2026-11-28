@@ -23,7 +23,7 @@ final class ValidationException extends DotenvException
             'Missing required environment variables: ' . implode(', ', $missing),
         );
         $exception->errors = array_map(
-            static fn (string $name): string => "{$name} is required but not defined.",
+            static fn(string $name): string => "{$name} is required but not defined.",
             $missing,
         );
 

@@ -131,9 +131,9 @@ FOO='hello\nworld'        # "hello\nworld" (literal backslash-n)
 Double-quoted values can span multiple lines. The newlines are preserved literally:
 
 ```ini
-RSA_KEY="-----BEGIN RSA PRIVATE KEY-----
-MIIEpAIBAAKCAQEA...
------END RSA PRIVATE KEY-----"
+TLS_CERTIFICATE="-----BEGIN CERTIFICATE-----
+MIIDdzCCAl+gAwIBAgIE...
+-----END CERTIFICATE-----"
 ```
 
 Single-quoted values cannot span multiple lines — an unterminated single quote on the same line is a parse error.

@@ -14,9 +14,9 @@ final class KeyPairTest extends TestCase
     {
         $kp = KeyPair::generate();
 
-        $this->assertSame(64, strlen($kp->privateKey));
-        $this->assertTrue(ctype_xdigit($kp->privateKey));
-        $this->assertSame(8, strlen($kp->publicId));
+        self::assertSame(64, strlen($kp->privateKey));
+        self::assertTrue(ctype_xdigit($kp->privateKey));
+        self::assertSame(8, strlen($kp->publicId));
     }
 
     public function testGenerateProducesUniqueKeys(): void
@@ -24,7 +24,7 @@ final class KeyPairTest extends TestCase
         $kp1 = KeyPair::generate();
         $kp2 = KeyPair::generate();
 
-        $this->assertNotSame($kp1->privateKey, $kp2->privateKey);
+        self::assertNotSame($kp1->privateKey, $kp2->privateKey);
     }
 
     public function testFromPrivateKeyReconstitutes(): void
@@ -32,8 +32,8 @@ final class KeyPairTest extends TestCase
         $original = KeyPair::generate();
         $restored = KeyPair::fromPrivateKey($original->privateKey);
 
-        $this->assertSame($original->privateKey, $restored->privateKey);
-        $this->assertSame($original->publicId, $restored->publicId);
+        self::assertSame($original->privateKey, $restored->privateKey);
+        self::assertSame($original->publicId, $restored->publicId);
     }
 
     public function testFromPrivateKeyRejectsInvalidLength(): void
@@ -56,6 +56,6 @@ final class KeyPairTest extends TestCase
         $encryptor = new \KaririCode\Dotenv\Security\Encryptor($kp->privateKey);
 
         $encrypted = $encryptor->encrypt('test-value');
-        $this->assertSame('test-value', $encryptor->decrypt($encrypted));
+        self::assertSame('test-value', $encryptor->decrypt($encrypted));
     }
 }

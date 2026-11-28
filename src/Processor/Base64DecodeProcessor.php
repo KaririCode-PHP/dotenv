@@ -9,6 +9,7 @@ use KaririCode\Dotenv\Exception\ConversionException;
 
 final readonly class Base64DecodeProcessor implements VariableProcessor
 {
+    #[\Override]
     public function process(string $rawValue, mixed $typedValue): string
     {
         $decoded = base64_decode($rawValue, true);

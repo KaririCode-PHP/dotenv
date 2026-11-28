@@ -221,7 +221,7 @@ final class Dotenv
     public function validate(): EnvironmentValidator
     {
         return new EnvironmentValidator(
-            fn (string $name): ?string => $this->resolveRawValue($name),
+            fn(string $name): ?string => $this->resolveRawValue($name),
         );
     }
 
@@ -405,27 +405,9 @@ final class Dotenv
      */
     private function loadFromCache(string $strategy, ?string $requested, ?string $basePath): bool
     {
-        $cachePath = $this->configuration->cachePath;
+        $snapshot = $this->matchingSnapshot($strategy, $requested, $basePath);
 
-        if ($cachePath === null) {
-            return false;
-        }
-
-        $snapshot = new PhpFileCache()->load($cachePath);
-
-        if ($snapshot === null
-            || $snapshot->strategy !== $strategy
-            || $snapshot->requestedEnvironment !== $requested
-            || ($snapshot->encrypted && $this->encryptor === null)
-        ) {
-            return false;
-        }
-
-        $sameFiles = $strategy === CacheSnapshot::STRATEGY_LOAD
-            ? $snapshot->sources === $this->filePaths
-            : ($snapshot->sources[0] ?? null) === $basePath;
-
-        if (!$sameFiles) {
+        if ($snapshot === null) {
             return false;
         }
 
@@ -436,6 +418,30 @@ final class Dotenv
         $this->markLoaded($strategy, $snapshot->environment, $requested, $snapshot->sources);
 
         return true;
+    }
+
+    /**
+     * The configured cache's snapshot, when the same strategy, environment
+     * request and files wrote it and its values can be decrypted.
+     */
+    private function matchingSnapshot(string $strategy, ?string $requested, ?string $basePath): ?CacheSnapshot
+    {
+        $cachePath = $this->configuration->cachePath;
+        $snapshot = $cachePath === null ? null : new PhpFileCache()->load($cachePath);
+
+        if ($snapshot === null
+            || $snapshot->strategy !== $strategy
+            || $snapshot->requestedEnvironment !== $requested
+            || ($snapshot->encrypted && $this->encryptor === null)
+        ) {
+            return null;
+        }
+
+        $sameFiles = $strategy === CacheSnapshot::STRATEGY_LOAD
+            ? $snapshot->sources === $this->filePaths
+            : ($snapshot->sources[0] ?? null) === $basePath;
+
+        return $sameFiles ? $snapshot : null;
     }
 
     private function loadFile(string $filePath, bool $required): void
@@ -482,25 +488,13 @@ final class Dotenv
         return new InterpolationContext(
             $inherited,
             $this->configuration->loadMode === LoadMode::SkipExisting ? $this->preExistingEnvironment() : [],
-            $encryptor === null ? null : static fn (string $value): string => $encryptor->decrypt($value),
+            $encryptor === null ? null : static fn(string $value): string => $encryptor->decrypt($value),
         );
     }
 
     private function setVariable(string $name, string $sourceValue, string $source): void
     {
-        if (!$this->isAllowed($name)) {
-            return;
-        }
-
-        // Pre-existing = present in the process before this instance loaded it.
-        // Variables loaded by an earlier file of this instance are cascade overrides.
-        $preExisting = !isset($this->variables[$name]) && $this->existsInProcess($name);
-
-        if ($preExisting && $this->configuration->loadMode === LoadMode::Immutable) {
-            throw ImmutableException::alreadyDefined($name);
-        }
-
-        if ($preExisting && $this->configuration->loadMode === LoadMode::SkipExisting) {
+        if (!$this->accepts($name)) {
             return;
         }
 
@@ -509,26 +503,51 @@ final class Dotenv
             ? $this->encryptor->decrypt($sourceValue)
             : $sourceValue;
 
-        $type = ValueType::String;
-        $typedValue = $value;
-
-        if ($this->configuration->typeCasting) {
-            $type = $this->typeSystem->detect($value);
-            $typedValue = $this->typeSystem->cast($value, $type);
-        }
-
-        $typedValue = $this->applyProcessors($name, $value, $typedValue);
+        $type = $this->configuration->typeCasting ? $this->typeSystem->detect($value) : ValueType::String;
+        /** @var mixed $typedValue casters and processors may return any value */
+        $typedValue = $this->applyProcessors($name, $value, $this->typeSystem->cast($value, $type));
 
         $this->variables[$name] = new EnvironmentVariable(
-            $name,
-            $value,
-            $type,
-            $typedValue,
-            $source,
-            isset($this->variables[$name]),
-            $encrypted,
+            name: $name,
+            rawValue: $value,
+            type: $type,
+            value: $typedValue,
+            source: $source,
+            overridden: isset($this->variables[$name]),
+            encrypted: $encrypted,
         );
 
+        $this->publish($name, $value);
+    }
+
+    /**
+     * Whether a loaded value may set the variable: the allow-list admits it,
+     * and the load mode lets it replace a value the process held before this
+     * instance loaded it. A variable an earlier file of this instance loaded
+     * is a cascade override, not a pre-existing value.
+     *
+     * @throws ImmutableException When the mode is immutable and the process already defines it.
+     */
+    private function accepts(string $name): bool
+    {
+        if (!$this->isAllowed($name)) {
+            return false;
+        }
+
+        if (isset($this->variables[$name]) || !$this->existsInProcess($name)) {
+            return true;
+        }
+
+        if ($this->configuration->loadMode === LoadMode::Immutable) {
+            throw ImmutableException::alreadyDefined($name);
+        }
+
+        return $this->configuration->loadMode !== LoadMode::SkipExisting;
+    }
+
+    /** Copies a loaded value into the superglobals and process environment the configuration names. */
+    private function publish(string $name, string $value): void
+    {
         if ($this->configuration->populateEnv) {
             $_ENV[$name] = $value;
         }
@@ -574,6 +593,10 @@ final class Dotenv
         $environment = [];
 
         foreach ([getenv(), $_SERVER, $_ENV] as $source) {
+            /**
+             * @var array-key $name a numeric name becomes an integer key
+             * @var mixed $value
+             */
             foreach ($source as $name => $value) {
                 if (is_string($name) && is_string($value)) {
                     $environment[$name] = $value;
@@ -647,6 +670,7 @@ final class Dotenv
     {
         foreach ($this->processors as [$pattern, $processor]) {
             if ($this->matchGlob($pattern, $name)) {
+                /** @var mixed $typedValue a processor may return any value */
                 $typedValue = $processor->process($value, $typedValue);
             }
         }

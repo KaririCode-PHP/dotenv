@@ -149,7 +149,7 @@ Value from the parser (or cache)
 ```
 
 - `EnvironmentVariable::$rawValue` holds the decrypted string, which is also what `$_ENV`/`$_SERVER` receive; `$encrypted` is `true` when the source stored the value encrypted. `debug()` reports it, and the CLI masks those values (SPEC-008).
-- **References to encrypted values receive the plaintext.** A same-file reference is decrypted through `InterpolationContext::$valueFilter`; a reference to an earlier file uses the already-decrypted value. `DATABASE_URL="pgsql://app:${DB_PASSWORD}@db/app"` therefore works when `DB_PASSWORD` is encrypted.
+- **References to encrypted values receive the plaintext.** A same-file reference is decrypted through `InterpolationContext::$valueFilter`; a reference to an earlier file uses the already-decrypted value. `DATABASE_URL="pgsql://app:${DB_PASSWORD}@db/app"` therefore works when `DB_PASSWORD` is encrypted. <!-- secret-scan:allow -->
 - **Cache:** with a key configured, `dumpCache()` stores every value encrypted, including plaintext derived from secrets (ADR-005).
 
 ## 8. Configuration

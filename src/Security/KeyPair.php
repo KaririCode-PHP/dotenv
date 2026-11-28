@@ -22,8 +22,7 @@ final readonly class KeyPair
     private function __construct(
         public string $privateKey,
         public string $publicId,
-    ) {
-    }
+    ) {}
 
     public static function generate(): self
     {

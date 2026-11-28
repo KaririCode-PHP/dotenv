@@ -28,7 +28,7 @@ final class CacheIntegrationTest extends IntegrationTestCase
     {
         $key = KeyPair::generate()->privateKey;
         $encrypted = new Encryptor($key)->encrypt('s3cr3t-pw');
-        $this->createEnvFile('.env', "DB_PASSWORD=\"{$encrypted}\"\nDATABASE_URL=\"pgsql://u:\${DB_PASSWORD}@h/db\"\nAPP_NAME=demo");
+        $this->createEnvFile('.env', "DB_PASSWORD=\"{$encrypted}\"\nDATABASE_URL=\"pgsql://u:\${DB_PASSWORD}@h/db\"\nAPP_NAME=demo"); // secret-scan:allow
 
         $writer = new Dotenv($this->fixturesDir, new DotenvConfiguration(loadMode: LoadMode::Overwrite, encryptionKey: $key));
         $writer->load();
@@ -42,7 +42,7 @@ final class CacheIntegrationTest extends IntegrationTestCase
         $reader->load();
 
         self::assertSame('cache', $reader->debug()['DATABASE_URL']['source']);
-        self::assertSame('pgsql://u:s3cr3t-pw@h/db', $reader->get('DATABASE_URL'));
+        self::assertSame('pgsql://u:s3cr3t-pw@h/db', $reader->get('DATABASE_URL')); // secret-scan:allow
         self::assertSame('demo', $reader->get('APP_NAME'));
     }
 

@@ -31,8 +31,7 @@ final readonly class EnvFileCipher
         private Encryptor $encryptor,
         private DotenvParser $parser = new DotenvParser(),
         private EnvFileScanner $scanner = new EnvFileScanner(),
-    ) {
-    }
+    ) {}
 
     /**
      * @throws ParseException When an assignment is malformed.
@@ -140,7 +139,7 @@ final readonly class EnvFileCipher
         }
 
         if ($rawValue[0] !== '"') {
-            $unquoted = preg_replace('/\s+#.*$/s', '', $rawValue) ?? $rawValue;
+            $unquoted = preg_replace('/\s+#.*\z/s', '', $rawValue) ?? $rawValue;
 
             return preg_match('/\$(\{[A-Za-z_]|[A-Za-z_])/', $unquoted) === 1;
         }

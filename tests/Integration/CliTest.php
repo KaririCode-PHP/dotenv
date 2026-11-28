@@ -187,7 +187,7 @@ final class CliTest extends IntegrationTestCase
 
     private function generateKey(): string
     {
-        preg_match('/DOTENV_PRIVATE_KEY=\s+([0-9a-f]{64})/', $this->runCli(['keygen'])[1], $matches);
+        self::assertSame(1, preg_match('/DOTENV_PRIVATE_KEY=\s+([0-9a-f]{64})/', $this->runCli(['keygen'])[1] ?? '', $matches));
 
         return $matches[1];
     }
@@ -204,7 +204,7 @@ final class CliTest extends IntegrationTestCase
         $command = array_merge([PHP_BINARY], $phpArguments, [dirname(__DIR__, 2) . '/bin/kariricode-dotenv'], $arguments);
         $baseEnv = array_filter(
             getenv(),
-            static fn (string $name): bool => !in_array($name, ['APP_ENV', 'DOTENV_PRIVATE_KEY'], true),
+            static fn(string $name): bool => !in_array($name, ['APP_ENV', 'DOTENV_PRIVATE_KEY'], true),
             ARRAY_FILTER_USE_KEY,
         );
 

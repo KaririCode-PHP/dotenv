@@ -123,7 +123,7 @@ final class TypeSystem
             return;
         }
 
-        usort($this->detectors, static fn (TypeDetector $a, TypeDetector $b): int => $b->priority() <=> $a->priority());
+        usort($this->detectors, static fn(TypeDetector $a, TypeDetector $b): int => $b->priority() <=> $a->priority());
         $this->sorted = true;
     }
 }

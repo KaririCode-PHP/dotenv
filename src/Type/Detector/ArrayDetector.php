@@ -15,11 +15,13 @@ use KaririCode\Dotenv\Enum\ValueType;
  */
 final readonly class ArrayDetector implements TypeDetector
 {
+    #[\Override]
     public function priority(): int
     {
         return 150;
     }
 
+    #[\Override]
     public function detect(string $value): ?ValueType
     {
         $trimmed = trim($value);
@@ -28,8 +30,6 @@ final readonly class ArrayDetector implements TypeDetector
             return null;
         }
 
-        $decoded = json_decode($trimmed, true);
-
-        return json_last_error() === JSON_ERROR_NONE && is_array($decoded) ? ValueType::Array : null;
+        return is_array(json_decode($trimmed, true)) ? ValueType::Array : null;
     }
 }

@@ -34,6 +34,5 @@ final readonly class EnvironmentVariable
         public string $source = '',
         public bool $overridden = false,
         public bool $encrypted = false,
-    ) {
-    }
+    ) {}
 }

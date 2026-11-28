@@ -27,8 +27,7 @@ final readonly class EnvEntry
         public ?string $name = null,
         public bool $exported = false,
         public string $rawValue = '',
-    ) {
-    }
+    ) {}
 
     public function isAssignment(): bool
     {

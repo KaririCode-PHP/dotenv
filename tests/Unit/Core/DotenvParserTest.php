@@ -244,9 +244,9 @@ final class DotenvParserTest extends TestCase
 
     public function testValueWithEqualsSign(): void
     {
-        $result = $this->parser->parse('CONNECTION=postgresql://user:pass@host/db?sslmode=require');
+        $result = $this->parser->parse('CONNECTION=postgresql://user:pass@host/db?sslmode=require'); // secret-scan:allow
 
-        self::assertSame(['CONNECTION' => 'postgresql://user:pass@host/db?sslmode=require'], $result);
+        self::assertSame(['CONNECTION' => 'postgresql://user:pass@host/db?sslmode=require'], $result); // secret-scan:allow
     }
 
     public function testWindowsLineEndings(): void
@@ -325,7 +325,7 @@ final class DotenvParserTest extends TestCase
 
     public function testValueFilterAppliesToSameFileReferencesOnly(): void
     {
-        $context = new InterpolationContext(valueFilter: static fn (string $v): string => strtoupper($v));
+        $context = new InterpolationContext(valueFilter: static fn(string $v): string => strtoupper($v));
 
         $result = $this->parser->parse("SECRET=abc\nURL=\"x:\${SECRET}\"", context: $context);
 

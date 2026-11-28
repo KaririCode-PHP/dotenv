@@ -34,6 +34,5 @@ final readonly class CacheSnapshot
         public array $sources,
         public array $variables,
         public bool $encrypted = false,
-    ) {
-    }
+    ) {}
 }

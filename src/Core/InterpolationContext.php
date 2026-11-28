@@ -35,6 +35,5 @@ final readonly class InterpolationContext
         public array $inherited = [],
         public array $locked = [],
         public ?\Closure $valueFilter = null,
-    ) {
-    }
+    ) {}
 }

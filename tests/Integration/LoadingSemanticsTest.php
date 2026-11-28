@@ -58,13 +58,13 @@ final class LoadingSemanticsTest extends IntegrationTestCase
     {
         $key = KeyPair::generate()->privateKey;
         $password = new Encryptor($key)->encrypt('s3cr3t');
-        $this->createEnvFile('.env', "DB_PASSWORD=\"{$password}\"\nDATABASE_URL=\"pgsql://app:\${DB_PASSWORD}@db/app\"");
+        $this->createEnvFile('.env', "DB_PASSWORD=\"{$password}\"\nDATABASE_URL=\"pgsql://app:\${DB_PASSWORD}@db/app\""); // secret-scan:allow
 
         $dotenv = new Dotenv($this->fixturesDir, new DotenvConfiguration(loadMode: LoadMode::Overwrite, encryptionKey: $key));
         $dotenv->load();
 
         self::assertSame('s3cr3t', $dotenv->get('DB_PASSWORD'));
-        self::assertSame('pgsql://app:s3cr3t@db/app', $dotenv->get('DATABASE_URL'));
+        self::assertSame('pgsql://app:s3cr3t@db/app', $dotenv->get('DATABASE_URL')); // secret-scan:allow
     }
 
     public function testDebugReportsWhichValuesWereEncrypted(): void

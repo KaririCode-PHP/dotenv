@@ -11,10 +11,11 @@ use PHPUnit\Framework\TestCase;
 
 final class EnvironmentValidatorTest extends TestCase
 {
+    /** @param array<string, string> $variables */
     private function makeValidator(array $variables): EnvironmentValidator
     {
         return new EnvironmentValidator(
-            fn (string $name): ?string => $variables[$name] ?? null,
+            fn(string $name): ?string => $variables[$name] ?? null,
         );
     }
 
@@ -24,7 +25,7 @@ final class EnvironmentValidatorTest extends TestCase
     {
         $v = $this->makeValidator(['DB_HOST' => 'localhost']);
         $v->required('DB_HOST')->assert();
-        $this->assertTrue(true);
+        $this->addToAssertionCount(1); // no exception: the variables are valid
     }
 
     public function testRequiredFailsWhenMissing(): void
@@ -43,11 +44,11 @@ final class EnvironmentValidatorTest extends TestCase
 
         try {
             $v->required('DB_HOST', 'DB_PORT', 'DB_NAME')->assert();
-            $this->fail('Expected ValidationException');
+            self::fail('Expected ValidationException');
         } catch (ValidationException $e) {
-            $this->assertCount(2, $e->errors());
-            $this->assertStringContainsString('DB_PORT', $e->getMessage());
-            $this->assertStringContainsString('DB_NAME', $e->getMessage());
+            self::assertCount(2, $e->errors());
+            self::assertStringContainsString('DB_PORT', $e->getMessage());
+            self::assertStringContainsString('DB_NAME', $e->getMessage());
         }
     }
 
@@ -57,7 +58,7 @@ final class EnvironmentValidatorTest extends TestCase
     {
         $v = $this->makeValidator(['DB_HOST' => 'localhost']);
         $v->required('DB_HOST')->notEmpty()->assert();
-        $this->assertTrue(true);
+        $this->addToAssertionCount(1); // no exception: the variables are valid
     }
 
     public function testNotEmptyFails(): void
@@ -75,7 +76,7 @@ final class EnvironmentValidatorTest extends TestCase
     {
         $v = $this->makeValidator(['DB_PORT' => '5432']);
         $v->required('DB_PORT')->isInteger()->assert();
-        $this->assertTrue(true);
+        $this->addToAssertionCount(1); // no exception: the variables are valid
     }
 
     public function testIsIntegerFailsOnFloat(): void
@@ -92,7 +93,7 @@ final class EnvironmentValidatorTest extends TestCase
     {
         $v = $this->makeValidator(['OFFSET' => '-10']);
         $v->required('OFFSET')->isInteger()->assert();
-        $this->assertTrue(true);
+        $this->addToAssertionCount(1); // no exception: the variables are valid
     }
 
     // ── Between ──────────────────────────────────────────────────────────
@@ -101,7 +102,7 @@ final class EnvironmentValidatorTest extends TestCase
     {
         $v = $this->makeValidator(['PORT' => '8080']);
         $v->required('PORT')->isInteger()->between(1, 65535)->assert();
-        $this->assertTrue(true);
+        $this->addToAssertionCount(1); // no exception: the variables are valid
     }
 
     public function testBetweenFailsBelowMin(): void
@@ -132,7 +133,7 @@ final class EnvironmentValidatorTest extends TestCase
             $v->required('DEBUG')->isBoolean()->assert();
         }
 
-        $this->assertTrue(true);
+        $this->addToAssertionCount(1); // no exception: the variables are valid
     }
 
     public function testIsBooleanFails(): void
@@ -151,7 +152,7 @@ final class EnvironmentValidatorTest extends TestCase
     {
         $v = $this->makeValidator(['ENV' => 'production']);
         $v->allowedValues('ENV', ['local', 'staging', 'production'])->assert();
-        $this->assertTrue(true);
+        $this->addToAssertionCount(1); // no exception: the variables are valid
     }
 
     public function testAllowedValuesFails(): void
@@ -170,7 +171,7 @@ final class EnvironmentValidatorTest extends TestCase
     {
         $v = $this->makeValidator(['KEY' => 'abcdef0123456789abcdef0123456789']);
         $v->matchesRegex('KEY', '/\A[a-f0-9]{32}\z/')->assert();
-        $this->assertTrue(true);
+        $this->addToAssertionCount(1); // no exception: the variables are valid
     }
 
     public function testMatchesRegexFails(): void
@@ -189,7 +190,7 @@ final class EnvironmentValidatorTest extends TestCase
     {
         $v = $this->makeValidator(['APP_URL' => 'https://example.com']);
         $v->url('APP_URL')->assert();
-        $this->assertTrue(true);
+        $this->addToAssertionCount(1); // no exception: the variables are valid
     }
 
     public function testUrlFails(): void
@@ -208,7 +209,7 @@ final class EnvironmentValidatorTest extends TestCase
     {
         $v = $this->makeValidator(['ADMIN' => 'admin@example.com']);
         $v->email('ADMIN')->assert();
-        $this->assertTrue(true);
+        $this->addToAssertionCount(1); // no exception: the variables are valid
     }
 
     public function testEmailFails(): void
@@ -226,8 +227,8 @@ final class EnvironmentValidatorTest extends TestCase
     public function testCustomCallbackPasses(): void
     {
         $v = $this->makeValidator(['DSN' => 'pgsql:host=localhost']);
-        $v->custom('DSN', fn (string $v): bool => str_starts_with($v, 'pgsql:'))->assert();
-        $this->assertTrue(true);
+        $v->custom('DSN', fn(string $v): bool => str_starts_with($v, 'pgsql:'))->assert();
+        $this->addToAssertionCount(1); // no exception: the variables are valid
     }
 
     public function testCustomCallbackFails(): void
@@ -236,7 +237,7 @@ final class EnvironmentValidatorTest extends TestCase
 
         $this->expectException(ValidationException::class);
 
-        $v->custom('DSN', fn (string $v): bool => str_starts_with($v, 'pgsql:'), 'DSN must use pgsql driver.')->assert();
+        $v->custom('DSN', fn(string $v): bool => str_starts_with($v, 'pgsql:'), 'DSN must use pgsql driver.')->assert();
     }
 
     // ── IfPresent (conditional) ──────────────────────────────────────────
@@ -245,7 +246,7 @@ final class EnvironmentValidatorTest extends TestCase
     {
         $v = $this->makeValidator([]);
         $v->ifPresent('REDIS_HOST')->notEmpty()->assert();
-        $this->assertTrue(true);
+        $this->addToAssertionCount(1); // no exception: the variables are valid
     }
 
     public function testIfPresentValidatesWhenPresent(): void
@@ -271,10 +272,10 @@ final class EnvironmentValidatorTest extends TestCase
                 ->isInteger('PORT')
                 ->isBoolean('DEBUG')
                 ->assert();
-            $this->fail('Expected ValidationException');
+            self::fail('Expected ValidationException');
         } catch (ValidationException $e) {
             // MISSING is required, PORT is not integer, DEBUG is not boolean
-            $this->assertCount(3, $e->errors());
+            self::assertCount(3, $e->errors());
         }
     }
 
@@ -287,7 +288,7 @@ final class EnvironmentValidatorTest extends TestCase
             $v->required('N')->isNumeric()->assert();
         }
 
-        $this->assertTrue(true);
+        $this->addToAssertionCount(1); // no exception: the variables are valid
     }
 
     public function testIsNumericFails(): void
@@ -303,7 +304,7 @@ final class EnvironmentValidatorTest extends TestCase
 
     public function testInvalidRegexIsAConfigurationErrorNotAWarning(): void
     {
-        $validator = new EnvironmentValidator(static fn (string $name): ?string => 'value');
+        $validator = new EnvironmentValidator(static fn(string $name): string => 'value');
 
         $this->expectException(ConfigurationException::class);
 

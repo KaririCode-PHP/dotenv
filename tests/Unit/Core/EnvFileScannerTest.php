@@ -61,6 +61,6 @@ final class EnvFileScannerTest extends TestCase
     {
         $entries = new EnvFileScanner()->scan("A=1\r\nB=2\rC=3");
 
-        self::assertSame(['A', 'B', 'C'], array_map(static fn ($e) => $e->name, $entries));
+        self::assertSame(['A', 'B', 'C'], array_map(static fn($e) => $e->name, $entries));
     }
 }

@@ -44,8 +44,7 @@ final readonly class DotenvConfiguration
         public array $allowList = [],
         public array $denyList = [],
         public ?string $environmentName = null,
-    ) {
-    }
+    ) {}
 
     public function withLoadMode(LoadMode $loadMode): self
     {

@@ -11,20 +11,21 @@ final readonly class BetweenRule implements ValidationRule
     public function __construct(
         private int|float $min,
         private int|float $max,
-    ) {
-    }
+    ) {}
 
+    #[\Override]
     public function passes(string $value): bool
     {
         if (!is_numeric($value)) {
             return false;
         }
 
-        $numeric = $value + 0;
+        $numeric = (float) $value;
 
         return $numeric >= $this->min && $numeric <= $this->max;
     }
 
+    #[\Override]
     public function message(): string
     {
         return "{name} must be between {$this->min} and {$this->max}.";

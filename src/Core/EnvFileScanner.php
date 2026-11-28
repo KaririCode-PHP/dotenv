@@ -41,30 +41,44 @@ final readonly class EnvFileScanner
                 continue;
             }
 
-            $block = [$line];
             $rawValue = ltrim($matches[3]);
-
-            if (str_starts_with($rawValue, '"') && !$this->closesDoubleQuote(substr($rawValue, 1))) {
-                while ($index + 1 < $lineCount) {
-                    $block[] = $lines[++$index];
-
-                    if ($this->closesDoubleQuote($lines[$index])) {
-                        break;
-                    }
-                }
-
-                $rawValue = implode("\n", array_merge([$rawValue], array_slice($block, 1)));
-            }
+            $continuation = str_starts_with($rawValue, '"') && !$this->closesDoubleQuote(substr($rawValue, 1))
+                ? $this->continuation($lines, $index + 1)
+                : [];
+            $index += count($continuation);
 
             $entries[] = new EnvEntry(
-                implode("\n", $block),
-                $matches[2],
-                $matches[1] !== '',
-                $rawValue,
+                text: implode("\n", [$line, ...$continuation]),
+                name: $matches[2],
+                exported: $matches[1] !== '',
+                rawValue: implode("\n", [$rawValue, ...$continuation]),
             );
         }
 
         return $entries;
+    }
+
+    /**
+     * The lines after an unterminated double-quoted value, up to and
+     * including the one that closes it, or to the end of the content.
+     *
+     * @param list<string> $lines
+     *
+     * @return list<string>
+     */
+    private function continuation(array $lines, int $from): array
+    {
+        $block = [];
+
+        foreach (array_slice($lines, $from) as $line) {
+            $block[] = $line;
+
+            if ($this->closesDoubleQuote($line)) {
+                break;
+            }
+        }
+
+        return $block;
     }
 
     /**

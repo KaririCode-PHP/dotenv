@@ -13,6 +13,4 @@ namespace KaririCode\Dotenv\Exception;
  * @package KaririCode\Dotenv
  * @since   4.0.0 ARFA 1.3
  */
-abstract class DotenvException extends \RuntimeException
-{
-}
+abstract class DotenvException extends \RuntimeException {}

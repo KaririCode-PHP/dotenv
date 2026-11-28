@@ -6,9 +6,6 @@ namespace KaririCode\Dotenv\Tests\Integration;
 
 use KaririCode\Dotenv\Dotenv;
 use KaririCode\Dotenv\Enum\LoadMode;
-
-use function KaririCode\Dotenv\env;
-
 use KaririCode\Dotenv\Exception\FileNotFoundException;
 use KaririCode\Dotenv\Exception\ValidationException;
 use KaririCode\Dotenv\Processor\CsvToArrayProcessor;
@@ -16,6 +13,8 @@ use KaririCode\Dotenv\Processor\UrlNormalizerProcessor;
 use KaririCode\Dotenv\Security\Encryptor;
 use KaririCode\Dotenv\Security\KeyPair;
 use KaririCode\Dotenv\ValueObject\DotenvConfiguration;
+
+use function KaririCode\Dotenv\env;
 
 final class DotenvIntegrationTest extends IntegrationTestCase
 {
@@ -120,7 +119,7 @@ final class DotenvIntegrationTest extends IntegrationTestCase
         // Should not throw
         $dotenv->required('FOO', 'BAZ');
 
-        self::assertTrue(true); // Reached without exception
+        $this->addToAssertionCount(1); // no exception: the variables are valid
     }
 
     public function testRequiredVariablesThrowOnMissing(): void
@@ -209,7 +208,7 @@ final class DotenvIntegrationTest extends IntegrationTestCase
             ->email('ADMIN_EMAIL')
             ->assert();
 
-        self::assertTrue(true);
+        $this->addToAssertionCount(1); // no exception: the variables are valid
     }
 
     public function testValidationDslCollectsAllErrors(): void
@@ -246,7 +245,7 @@ final class DotenvIntegrationTest extends IntegrationTestCase
             ->ifPresent('REDIS_HOST')->notEmpty()
             ->assert();
 
-        self::assertTrue(true);
+        $this->addToAssertionCount(1); // no exception: the variables are valid
     }
 
     public function testValidationCustomCallback(): void
@@ -257,10 +256,10 @@ final class DotenvIntegrationTest extends IntegrationTestCase
         $dotenv->load();
 
         $dotenv->validate()
-            ->custom('DB_HOST', fn (string $v): bool => str_starts_with($v, 'pgsql:'))
+            ->custom('DB_HOST', fn(string $v): bool => str_starts_with($v, 'pgsql:'))
             ->assert();
 
-        self::assertTrue(true);
+        $this->addToAssertionCount(1); // no exception: the variables are valid
     }
 
     // ── Encryption ───────────────────────────────────────────────────────
@@ -490,7 +489,7 @@ final class DotenvIntegrationTest extends IntegrationTestCase
         $dotenv = new Dotenv($this->fixturesDir);
         $dotenv->loadWithSchema($schemaPath);
 
-        self::assertTrue(true);
+        $this->addToAssertionCount(1); // no exception: the variables are valid
     }
 
     public function testSchemaValidationFails(): void

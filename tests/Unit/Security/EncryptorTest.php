@@ -25,7 +25,7 @@ final class EncryptorTest extends TestCase
         $encrypted = $encryptor->encrypt($plaintext);
         $decrypted = $encryptor->decrypt($encrypted);
 
-        $this->assertSame($plaintext, $decrypted);
+        self::assertSame($plaintext, $decrypted);
     }
 
     public function testEncryptedValueHasPrefix(): void
@@ -33,8 +33,8 @@ final class EncryptorTest extends TestCase
         $encryptor = new Encryptor($this->hexKey);
         $encrypted = $encryptor->encrypt('test');
 
-        $this->assertTrue(Encryptor::isEncrypted($encrypted));
-        $this->assertStringStartsWith('encrypted:', $encrypted);
+        self::assertTrue(Encryptor::isEncrypted($encrypted));
+        self::assertStringStartsWith('encrypted:', $encrypted);
     }
 
     public function testDecryptReturnsPlaintextIfNotEncrypted(): void
@@ -42,14 +42,14 @@ final class EncryptorTest extends TestCase
         $encryptor = new Encryptor($this->hexKey);
         $plaintext = 'just-a-regular-value';
 
-        $this->assertSame($plaintext, $encryptor->decrypt($plaintext));
+        self::assertSame($plaintext, $encryptor->decrypt($plaintext));
     }
 
     public function testIsEncryptedDetectsPrefix(): void
     {
-        $this->assertTrue(Encryptor::isEncrypted('encrypted:abc123'));
-        $this->assertFalse(Encryptor::isEncrypted('plain-value'));
-        $this->assertFalse(Encryptor::isEncrypted(''));
+        self::assertTrue(Encryptor::isEncrypted('encrypted:abc123'));
+        self::assertFalse(Encryptor::isEncrypted('plain-value'));
+        self::assertFalse(Encryptor::isEncrypted(''));
     }
 
     public function testDifferentNoncesProduceDifferentCiphertexts(): void
@@ -60,11 +60,11 @@ final class EncryptorTest extends TestCase
         $enc1 = $encryptor->encrypt($plaintext);
         $enc2 = $encryptor->encrypt($plaintext);
 
-        $this->assertNotSame($enc1, $enc2);
+        self::assertNotSame($enc1, $enc2);
 
         // Both decrypt to the same plaintext
-        $this->assertSame($plaintext, $encryptor->decrypt($enc1));
-        $this->assertSame($plaintext, $encryptor->decrypt($enc2));
+        self::assertSame($plaintext, $encryptor->decrypt($enc1));
+        self::assertSame($plaintext, $encryptor->decrypt($enc2));
     }
 
     public function testWrongKeyFailsDecryption(): void
@@ -104,7 +104,7 @@ final class EncryptorTest extends TestCase
         $encryptor = new Encryptor($rawKey);
 
         $encrypted = $encryptor->encrypt('binary-key-test');
-        $this->assertSame('binary-key-test', $encryptor->decrypt($encrypted));
+        self::assertSame('binary-key-test', $encryptor->decrypt($encrypted));
     }
 
     public function testEncryptsEmptyString(): void
@@ -112,7 +112,7 @@ final class EncryptorTest extends TestCase
         $encryptor = new Encryptor($this->hexKey);
 
         $encrypted = $encryptor->encrypt('');
-        $this->assertSame('', $encryptor->decrypt($encrypted));
+        self::assertSame('', $encryptor->decrypt($encrypted));
     }
 
     public function testEncryptsUnicode(): void
@@ -121,7 +121,7 @@ final class EncryptorTest extends TestCase
         $plaintext = 'Régua de cobrança — ICP-Brasil 🇧🇷';
 
         $encrypted = $encryptor->encrypt($plaintext);
-        $this->assertSame($plaintext, $encryptor->decrypt($encrypted));
+        self::assertSame($plaintext, $encryptor->decrypt($encrypted));
     }
 
     public function testEncryptsLargePayload(): void
@@ -130,6 +130,6 @@ final class EncryptorTest extends TestCase
         $plaintext = str_repeat('A', 10_000);
 
         $encrypted = $encryptor->encrypt($plaintext);
-        $this->assertSame($plaintext, $encryptor->decrypt($encrypted));
+        self::assertSame($plaintext, $encryptor->decrypt($encrypted));
     }
 }

@@ -21,6 +21,7 @@ final readonly class ArrayCaster implements TypeCaster
      * @throws \JsonException On malformed JSON.
      * @throws ConversionException When the JSON is valid but not a list.
      */
+    #[\Override]
     public function cast(string $value): array
     {
         $decoded = json_decode(trim($value), true, 512, JSON_THROW_ON_ERROR);

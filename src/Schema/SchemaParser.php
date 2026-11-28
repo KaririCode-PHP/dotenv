@@ -66,7 +66,7 @@ final readonly class SchemaParser
             }
 
             // Section header: [VAR_NAME]
-            if (preg_match('/^\[([A-Za-z_][A-Za-z0-9_]*)\]$/', $line, $matches)) {
+            if (preg_match('/^\[([A-Za-z_][A-Za-z0-9_]*)\]\z/', $line, $matches) === 1) {
                 $currentSection = $matches[1];
                 $schema[$currentSection] ??= [];
                 continue;
@@ -95,54 +95,56 @@ final readonly class SchemaParser
         EnvironmentValidator $validator,
     ): void {
         foreach ($schema as $variableName => $directives) {
-            $isRequired = $this->boolDirective($directives, 'required');
-
-            if ($isRequired) {
-                $validator->required($variableName);
-            } else {
-                $validator->ifPresent($variableName);
-            }
-
-            // notEmpty
-            if ($this->boolDirective($directives, 'notEmpty')) {
-                $validator->notEmpty($variableName);
-            }
-
-            // Type-based rules
-            $type = $directives['type'] ?? null;
-            if ($type !== null) {
-                match ($type) {
-                    'integer' => $validator->isInteger($variableName),
-                    'boolean' => $validator->isBoolean($variableName),
-                    'numeric' => $validator->isNumeric($variableName),
-                    'email' => $validator->email($variableName),
-                    'url' => $validator->url($variableName),
-                    'string' => null, // No additional rule needed
-                    default => throw ValidationException::schemaViolation(
-                        "Unknown type '{$type}' for [{$variableName}].",
-                    ),
-                };
-            }
-
-            // Numeric range (min/max)
-            $min = isset($directives['min']) ? (float) $directives['min'] : null;
-            $max = isset($directives['max']) ? (float) $directives['max'] : null;
-
-            if ($min !== null && $max !== null) {
-                $validator->between($min, $max);
-            }
-
-            // Allowed values
-            if (isset($directives['allowed'])) {
-                $allowed = array_map(trim(...), explode(',', $directives['allowed']));
-                $validator->allowedValues($variableName, $allowed);
-            }
-
-            // Regex
-            if (isset($directives['regex'])) {
-                $validator->matchesRegex($variableName, $directives['regex']);
-            }
+            $this->applyVariable($variableName, $directives, $validator);
         }
+    }
+
+    /**
+     * @param array<string, string> $directives
+     *
+     * @throws ValidationException When the type is unknown.
+     */
+    private function applyVariable(string $name, array $directives, EnvironmentValidator $validator): void
+    {
+        if ($this->boolDirective($directives, 'required')) {
+            $validator->required($name);
+        } else {
+            $validator->ifPresent($name);
+        }
+
+        if ($this->boolDirective($directives, 'notEmpty')) {
+            $validator->notEmpty($name);
+        }
+
+        $this->applyType($name, $directives['type'] ?? 'string', $validator);
+
+        if (isset($directives['min'], $directives['max'])) {
+            $validator->between((float) $directives['min'], (float) $directives['max']);
+        }
+
+        if (isset($directives['allowed'])) {
+            $validator->allowedValues($name, array_map(trim(...), explode(',', $directives['allowed'])));
+        }
+
+        if (isset($directives['regex'])) {
+            $validator->matchesRegex($name, $directives['regex']);
+        }
+    }
+
+    /**
+     * @throws ValidationException When the type is unknown.
+     */
+    private function applyType(string $name, string $type, EnvironmentValidator $validator): void
+    {
+        match ($type) {
+            'integer' => $validator->isInteger($name),
+            'boolean' => $validator->isBoolean($name),
+            'numeric' => $validator->isNumeric($name),
+            'email' => $validator->email($name),
+            'url' => $validator->url($name),
+            'string' => null, // no rule beyond presence
+            default => throw ValidationException::schemaViolation("Unknown type '{$type}' for [{$name}]."),
+        };
     }
 
     /**

@@ -23,6 +23,5 @@ final readonly class CipherResult
         public string $content,
         public array $changed,
         public array $skipped,
-    ) {
-    }
+    ) {}
 }

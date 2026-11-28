@@ -27,6 +27,7 @@ final readonly class CsvToArrayProcessor implements VariableProcessor
     /**
      * @return list<string>
      */
+    #[\Override]
     public function process(string $rawValue, mixed $typedValue): array
     {
         if (trim($rawValue) === '') {

@@ -271,6 +271,36 @@ function commandCacheClear(array $options): int
     return 0;
 }
 
+/** @param list<int|string> $names */
+function reportOnlyIn(string $label, array $names): void
+{
+    if ($names === []) {
+        return;
+    }
+
+    stdout("Only in {$label}:");
+
+    foreach ($names as $name) {
+        stdout("  + {$name}");
+    }
+}
+
+/** @param array<string, array{string, string}> $different */
+function reportDifferent(string $label1, string $label2, array $different): void
+{
+    if ($different === []) {
+        return;
+    }
+
+    stdout('Different values:');
+
+    foreach ($different as $name => [$value1, $value2]) {
+        stdout("  ~ {$name}");
+        stdout("    {$label1}: {$value1}");
+        stdout("    {$label2}: {$value2}");
+    }
+}
+
 /**
  * @param list<string> $positional
  */
@@ -289,8 +319,8 @@ function commandDiff(array $positional): int
     $vars1 = $parser->parse(readFile($file1), $file1);
     $vars2 = $parser->parse(readFile($file2), $file2);
 
-    $plain = static fn (string $value): string => $encryptor !== null ? $encryptor->decrypt($value) : $value;
-    $shown = static fn (string $value): string => Encryptor::isEncrypted($value) ? '[encrypted]' : $value;
+    $plain = static fn(string $value): string => $encryptor !== null ? $encryptor->decrypt($value) : $value;
+    $shown = static fn(string $value): string => Encryptor::isEncrypted($value) ? '[encrypted]' : $value;
 
     $onlyIn1 = array_keys(array_diff_key($vars1, $vars2));
     $onlyIn2 = array_keys(array_diff_key($vars2, $vars1));
@@ -308,25 +338,9 @@ function commandDiff(array $positional): int
         return 0;
     }
 
-    foreach ([[basename($file1), $onlyIn1], [basename($file2), $onlyIn2]] as [$label, $names]) {
-        if ($names !== []) {
-            stdout("Only in {$label}:");
-
-            foreach ($names as $name) {
-                stdout("  + {$name}");
-            }
-        }
-    }
-
-    if ($different !== []) {
-        stdout('Different values:');
-
-        foreach ($different as $name => [$value1, $value2]) {
-            stdout("  ~ {$name}");
-            stdout('    ' . basename($file1) . ": {$value1}");
-            stdout('    ' . basename($file2) . ": {$value2}");
-        }
-    }
+    reportOnlyIn(basename($file1), $onlyIn1);
+    reportOnlyIn(basename($file2), $onlyIn2);
+    reportDifferent(basename($file1), basename($file2), $different);
 
     return 0;
 }

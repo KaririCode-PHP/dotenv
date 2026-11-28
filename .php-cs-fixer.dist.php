@@ -2,27 +2,16 @@
 
 declare(strict_types=1);
 
-$finder = PhpCsFixer\Finder::create()
-    ->in(__DIR__ . '/src')
-    ->in(__DIR__ . '/tests')
-    ->name('*.php')
-    ->append([__DIR__ . '/bin/kariricode-dotenv']);
-
+// PER Coding Style (Spec V4.3.3 §25 pins 3.1). php-cs-fixer 3.95 implements up to 3.0;
+// the three points E-046 names — `fn(` without a space, a blank line after
+// `namespace`, no hard line limit — are already enforced by the 3.0 rules.
 return (new PhpCsFixer\Config())
-    ->setRiskyAllowed(true)
+    ->setRiskyAllowed(false)
     ->setRules([
-        '@PSR12' => true,
-        '@PHP84Migration' => true,
-        'declare_strict_types' => true,
-        'array_syntax' => ['syntax' => 'short'],
-        'ordered_imports' => ['sort_algorithm' => 'alpha'],
-        'no_unused_imports' => true,
-        'trailing_comma_in_multiline' => ['elements' => ['arrays', 'arguments', 'parameters']],
-        'single_quote' => true,
-        'binary_operator_spaces' => ['default' => 'single_space'],
-        'blank_line_before_statement' => ['statements' => ['return', 'throw', 'try']],
-        'phpdoc_align' => ['align' => 'left'],
-        'native_function_invocation' => false,
-        'concat_space' => ['spacing' => 'one'],
+        '@PER-CS3.0' => true,
     ])
-    ->setFinder($finder);
+    ->setFinder(
+        PhpCsFixer\Finder::create()
+            ->in([__DIR__ . '/src', __DIR__ . '/tests', __DIR__ . '/tools'])
+            ->append([__DIR__ . '/bin/kariricode-dotenv']),
+    );

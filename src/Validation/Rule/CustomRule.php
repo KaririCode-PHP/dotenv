@@ -12,14 +12,15 @@ final readonly class CustomRule implements ValidationRule
     public function __construct(
         private \Closure $callback,
         private string $failureMessage = '{name} failed custom validation.',
-    ) {
-    }
+    ) {}
 
+    #[\Override]
     public function passes(string $value): bool
     {
         return ($this->callback)($value);
     }
 
+    #[\Override]
     public function message(): string
     {
         return $this->failureMessage;

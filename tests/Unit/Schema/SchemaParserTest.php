@@ -107,13 +107,13 @@ final class SchemaParserTest extends TestCase
         $variables = ['DB_HOST' => 'localhost', 'DB_PORT' => '5432'];
 
         $validator = new EnvironmentValidator(
-            fn (string $name): ?string => $variables[$name] ?? null,
+            fn(string $name): ?string => $variables[$name] ?? null,
         );
 
         $this->parser->applyToValidator($schema, $validator);
         $validator->assert();
 
-        $this->assertTrue(true);
+        $this->addToAssertionCount(1); // no exception: the variables are valid
     }
 
     public function testApplyToValidatorFailsOnMissingRequired(): void
@@ -124,7 +124,7 @@ final class SchemaParserTest extends TestCase
             SCHEMA);
 
         $validator = new EnvironmentValidator(
-            fn (string $name): ?string => null,
+            fn(string $name): ?string => null,
         );
 
         $this->parser->applyToValidator($schema, $validator);
@@ -146,7 +146,7 @@ final class SchemaParserTest extends TestCase
         $variables = ['DB_PORT' => 'not-a-number'];
 
         $validator = new EnvironmentValidator(
-            fn (string $name): ?string => $variables[$name] ?? null,
+            fn(string $name): ?string => $variables[$name] ?? null,
         );
 
         $this->parser->applyToValidator($schema, $validator);
@@ -168,7 +168,7 @@ final class SchemaParserTest extends TestCase
         $variables = ['APP_ENV' => 'invalid'];
 
         $validator = new EnvironmentValidator(
-            fn (string $name): ?string => $variables[$name] ?? null,
+            fn(string $name): ?string => $variables[$name] ?? null,
         );
 
         $this->parser->applyToValidator($schema, $validator);
@@ -188,13 +188,13 @@ final class SchemaParserTest extends TestCase
             SCHEMA);
 
         $validator = new EnvironmentValidator(
-            fn (string $name): ?string => null,
+            fn(string $name): ?string => null,
         );
 
         $this->parser->applyToValidator($schema, $validator);
         $validator->assert();
 
-        $this->assertTrue(true);
+        $this->addToAssertionCount(1); // no exception: the variables are valid
     }
 
     public function testUnknownTypeThrows(): void
@@ -205,7 +205,7 @@ final class SchemaParserTest extends TestCase
             SCHEMA);
 
         $validator = new EnvironmentValidator(
-            fn (string $name): ?string => 'test',
+            fn(string $name): string => 'test',
         );
 
         $this->expectException(ValidationException::class);

@@ -36,8 +36,5 @@ function env(string $key, mixed $default = null): mixed
         return $value;
     }
 
-    static $typeSystem = null;
-    $typeSystem ??= new TypeSystem();
-
-    return $typeSystem->resolve($value);
+    return (new TypeSystem())->resolve($value);
 }

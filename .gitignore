@@ -1,18 +1,7 @@
 /vendor/
-composer.lock
-
-# Tooling caches
+/.kcode/
+/build/
 /.phpunit.cache/
-/.php-cs-fixer.cache
 /.phpstan.cache/
-.phpunit.result.cache
-
-# Local environment overrides (see ADR-007)
-.env.local
-.env.*.local
-.env.cache.php
-
-# IDE
-/.idea/
-/.vscode/
-*.swp
+/.php-cs-fixer.cache
+/sbom.cdx.json

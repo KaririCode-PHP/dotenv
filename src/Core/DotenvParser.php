@@ -59,12 +59,17 @@ final readonly class DotenvParser
         $lines = $this->normalizeLines($content);
         $escapedDollar = $this->escapedDollarToken($content);
 
-        $expand = function (string $value) use (&$variables, $context, $escapedDollar): string {
-            /** @var array<string, string> $variables */
-            $expanded = $this->expandReferences($value, $variables, $context);
+        $values = new ValueContext(
+            lines: $lines,
+            filePath: $filePath,
+            escapedDollar: $escapedDollar,
+            expander: function (string $value) use (&$variables, $context, $escapedDollar): string {
+                /** @var array<string, string> $variables */
+                $expanded = $this->expandReferences($value, $variables, $context);
 
-            return str_replace($escapedDollar, '$', $expanded);
-        };
+                return str_replace($escapedDollar, '$', $expanded);
+            },
+        );
 
         $lineCount = count($lines);
         $lineNumber = 0;
@@ -103,14 +108,7 @@ final readonly class DotenvParser
                 throw ParseException::invalidVariableName($name, $lineNumber, $filePath, $strictNames);
             }
 
-            [$parsedValue, $consumed] = $this->parseValue(
-                $rawValue,
-                $lines,
-                $lineNumber,
-                $filePath,
-                $expand,
-                $escapedDollar,
-            );
+            [$parsedValue, $consumed] = $this->parseValue($rawValue, $lineNumber, $values);
             $lineNumber += $consumed;
 
             $variables[$name] = $parsedValue;
@@ -124,95 +122,100 @@ final readonly class DotenvParser
     /**
      * Parses the value portion of a KEY=VALUE line.
      *
-     * @param list<string> $lines All normalized lines of the content.
-     * @param \Closure(string): string $expand Interpolates references in a value.
+     * @param int<0, max> $currentLine 1-based number of the line, which is also the index of the next one.
      *
-     * @return array{0: string, 1: int} Tuple of [parsed value, additional lines consumed].
+     * @return array{0: string, 1: int<0, max>} Tuple of [parsed value, additional lines consumed].
      */
-    private function parseValue(
-        string $rawValue,
-        array $lines,
-        int $currentLine,
-        string $filePath,
-        \Closure $expand,
-        string $escapedDollar,
-    ): array {
+    private function parseValue(string $rawValue, int $currentLine, ValueContext $values): array
+    {
         if ($rawValue === '') {
             return ['', 0];
         }
 
         if ($rawValue[0] === '"') {
-            return $this->parseDoubleQuoted($rawValue, $lines, $currentLine, $filePath, $expand, $escapedDollar);
+            return $this->parseDoubleQuoted($rawValue, $currentLine, $values);
         }
 
         if ($rawValue[0] === "'") {
-            return $this->parseSingleQuoted($rawValue, $currentLine, $filePath);
+            return $this->parseSingleQuoted($rawValue, $currentLine, $values->filePath);
         }
 
-        return [$this->parseUnquoted($rawValue, $expand), 0];
+        return [$this->parseUnquoted($rawValue, $values), 0];
     }
 
     /**
-     * @param list<string> $lines
-     * @param \Closure(string): string $expand
+     * A double-quoted value, which may continue onto the following lines
+     * until an unescaped quote closes it.
      *
-     * @return array{0: string, 1: int}
+     * @param int<0, max> $currentLine
+     *
+     * @return array{0: string, 1: int<0, max>}
      */
-    private function parseDoubleQuoted(
-        string $rawValue,
-        array $lines,
-        int $currentLine,
-        string $filePath,
-        \Closure $expand,
-        string $escapedDollar,
-    ): array {
-        $value = substr($rawValue, 1);
+    private function parseDoubleQuoted(string $rawValue, int $currentLine, ValueContext $values): array
+    {
+        $segment = substr($rawValue, 1);
         $result = '';
         $extraLines = 0;
 
         while (true) {
-            $length = strlen($value);
+            [$decoded, $closed] = $this->decodeDoubleQuoted($segment, $values->escapedDollar);
+            $result .= $decoded;
 
-            for ($i = 0; $i < $length; ++$i) {
-                $char = $value[$i];
-
-                if ($char === '\\' && $i + 1 < $length) {
-                    $next = $value[$i + 1];
-                    $result .= match ($next) {
-                        'n' => "\n",
-                        'r' => "\r",
-                        't' => "\t",
-                        '"' => '"',
-                        '\\' => '\\',
-                        '$' => $escapedDollar,
-                        default => '\\' . $next,
-                    };
-                    ++$i;
-
-                    continue;
-                }
-
-                if ($char === '"') {
-                    return [$expand($result), $extraLines];
-                }
-
-                $result .= $char;
+            if ($closed) {
+                return [$values->expand($result), $extraLines];
             }
 
             $nextLineIndex = $currentLine + $extraLines;
 
-            if ($nextLineIndex >= count($lines)) {
-                throw ParseException::unterminatedQuote($currentLine, $filePath);
+            if ($nextLineIndex >= count($values->lines)) {
+                throw ParseException::unterminatedQuote($currentLine, $values->filePath);
             }
 
             $result .= "\n";
-            $value = $lines[$nextLineIndex];
+            $segment = $values->lines[$nextLineIndex];
             ++$extraLines;
         }
     }
 
     /**
-     * @return array{0: string, 1: int}
+     * Decodes one line of a double-quoted value, up to its closing quote.
+     *
+     * @return array{0: string, 1: bool} The decoded text, and whether the quote closed on this line.
+     */
+    private function decodeDoubleQuoted(string $segment, string $escapedDollar): array
+    {
+        $result = '';
+        $length = strlen($segment);
+
+        for ($i = 0; $i < $length; ++$i) {
+            $char = $segment[$i];
+
+            if ($char === '"') {
+                return [$result, true];
+            }
+
+            if ($char === '\\' && $i + 1 < $length) {
+                $result .= match ($segment[++$i]) {
+                    'n' => "\n",
+                    'r' => "\r",
+                    't' => "\t",
+                    '"' => '"',
+                    '\\' => '\\',
+                    '$' => $escapedDollar,
+                    default => '\\' . $segment[$i],
+                };
+
+                continue;
+            }
+
+            $result .= $char;
+        }
+
+        return [$result, false];
+    }
+
+    /**
+     * @return array{0: string, 1: 0}
      */
     private function parseSingleQuoted(string $rawValue, int $currentLine, string $filePath): array
     {
@@ -225,15 +228,12 @@ final readonly class DotenvParser
         return [substr($rawValue, 1, $closingPos - 1), 0];
     }
 
-    /**
-     * @param \Closure(string): string $expand
-     */
-    private function parseUnquoted(string $rawValue, \Closure $expand): string
+    private function parseUnquoted(string $rawValue, ValueContext $values): string
     {
         // Strip inline comment: `#` preceded by whitespace
-        $value = preg_replace('/\s+#.*$/', '', $rawValue) ?? $rawValue;
+        $value = preg_replace('/\s+#.*\z/', '', $rawValue) ?? $rawValue;
 
-        return $expand(trim($value));
+        return $values->expand(trim($value));
     }
 
     // ── Variable Expansion ───────────────────────────────────────────────
@@ -252,6 +252,7 @@ final readonly class DotenvParser
 
         return preg_replace_callback(
             self::REFERENCE_PATTERN,
+            /** @param array<array-key, string|null> $matches unmatched groups are null (PREG_UNMATCHED_AS_NULL) */
             function (array $matches) use ($variables, $context): string {
                 if ($matches['bare'] !== null) {
                     return $this->resolveReference($matches['bare'], $variables, $context) ?? '';

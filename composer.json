@@ -1,6 +1,6 @@
 {
     "name": "kariricode/dotenv",
-    "description": "Production-grade PHP dotenv with auto type casting, AES-256-GCM encryption, OPcache caching, fluent validation DSL, environment-aware loading, and CLI tooling — zero dependencies, PHP 8.4+, ARFA 1.3.",
+    "description": "Production-grade PHP dotenv with type casting, AES-256-GCM encrypted values, an OPcache-friendly cache, a validation DSL, environment-aware loading and a CLI, for PHP 8.4+, ARFA 1.3.",
     "type": "library",
     "license": "MIT",
     "keywords": [
@@ -21,7 +21,7 @@
     "authors": [
         {
             "name": "Walmir Silva",
-            "email": "community.woop@kariricode.org"
+            "email": "walmir.silva@kariricode.org"
         }
     ],
     "homepage": "https://kariricode.org",
@@ -33,11 +33,6 @@
     },
     "suggest": {
         "ext-openssl": "Required for encrypted .env values (AES-256-GCM)"
-    },
-    "require-dev": {
-        "phpunit/phpunit": "^11.0",
-        "phpstan/phpstan": "^2.0",
-        "friendsofphp/php-cs-fixer": "^3.64"
     },
     "autoload": {
         "psr-4": {
@@ -53,9 +48,34 @@
         }
     },
     "scripts": {
-        "test": "phpunit",
-        "analyse": "phpstan analyse",
-        "cs-fix": "php-cs-fixer fix"
+        "test": "kcode test",
+        "test-unit": "kcode test --testsuite=unit,integration",
+        "test-conformance": "kcode test --testsuite=conformance",
+        "phpstan": "kcode run phpstan analyse --no-progress --memory-limit=1G",
+        "psalm": "kcode run psalm --no-cache --show-info=false",
+        "complexity": "@php tools/complexity.php",
+        "mutation": [
+            "Composer\\Config::disableProcessTimeout",
+            "kcode run infection --threads=max --only-covering-test-cases --no-progress --show-mutations=0"
+        ],
+        "security": [
+            "@composer validate --strict",
+            "@composer audit --locked",
+            "@composer audit --locked --working-dir=.kcode",
+            "@php tools/secret-scan.php",
+            "@php tools/secret-scan.php --self-test"
+        ],
+        "sbom": "@php tools/sbom.php sbom.cdx.json",
+        "cs-check": "kcode cs:fix --check",
+        "cs-fix": "kcode cs:fix",
+        "check": [
+            "@cs-check",
+            "@phpstan",
+            "@psalm",
+            "@complexity",
+            "@test",
+            "@mutation"
+        ]
     },
     "config": {
         "sort-packages": true,
@@ -65,18 +85,18 @@
     "prefer-stable": true,
     "extra": {
         "kariricode": {
-            "component": "dotenv",
-            "version": "4.5.0",
             "arfa": {
                 "version": "1.3",
-                "level": 1,
-                "principles": [
-                    "P1",
-                    "P4",
-                    "P5"
-                ]
+                "level": 1
             },
-            "spec": "V4.0"
+            "asvs": {
+                "version": "5.0",
+                "level": 2
+            },
+            "spec": "4.3.3"
+        },
+        "branch-alias": {
+            "dev-main": "4.x-dev"
         }
     }
 }

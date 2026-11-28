@@ -174,7 +174,7 @@ final class TypeSystemTest extends TestCase
 
     public function testCustomDetectorIsRespected(): void
     {
-        $customDetector = new class () implements TypeDetector {
+        $customDetector = new class implements TypeDetector {
             public function priority(): int
             {
                 return 999; // Highest priority
@@ -194,7 +194,7 @@ final class TypeSystemTest extends TestCase
 
     public function testCustomCasterOverridesDefault(): void
     {
-        $customCaster = new class () implements TypeCaster {
+        $customCaster = new class implements TypeCaster {
             public function cast(string $value): int
             {
                 return (int) $value * 100;

@@ -81,40 +81,13 @@ final readonly class PhpFileCache
         }
 
         $data = include $path;
+        $meta = is_array($data) ? $data['meta'] ?? null : null;
 
-        if (!is_array($data) || !is_array($data['meta'] ?? null) || !is_array($data['variables'] ?? null)) {
+        if (!is_array($data) || !is_array($meta) || ($meta['format'] ?? null) !== self::FORMAT) {
             return null;
         }
 
-        $meta = $data['meta'];
-
-        if (($meta['format'] ?? null) !== self::FORMAT
-            || !is_string($meta['strategy'] ?? null)
-            || !is_string($meta['source_hash'] ?? null)
-            || !is_bool($meta['encrypted'] ?? null)
-            || !$this->isNullableString($meta['environment'] ?? null)
-            || !$this->isNullableString($meta['requested_environment'] ?? null)
-        ) {
-            return null;
-        }
-
-        $sources = $this->stringList($meta['sources'] ?? null);
-        $variables = $this->stringMap($data['variables']);
-
-        if ($sources === null || $variables === null) {
-            return null;
-        }
-
-        if (!hash_equals($meta['source_hash'], $this->computeSourceHash($sources))) {
-            return null;
-        }
-
-        /** @var string|null $environment */
-        $environment = $meta['environment'] ?? null;
-        /** @var string|null $requested */
-        $requested = $meta['requested_environment'] ?? null;
-
-        return new CacheSnapshot($meta['strategy'], $environment, $requested, $sources, $variables, $meta['encrypted']);
+        return $this->snapshot($meta, $data['variables'] ?? null);
     }
 
     public function clear(string $path): void
@@ -143,18 +116,67 @@ final readonly class PhpFileCache
         foreach ($filePaths as $filePath) {
             clearstatcache(true, $filePath);
             hash_update($context, $filePath . "\0");
-            hash_update(
-                $context,
-                is_file($filePath)
-                    ? filemtime($filePath) . ':' . filesize($filePath) . ':' . fileinode($filePath)
-                    : 'absent',
-            );
+            $stat = is_file($filePath) ? stat($filePath) : false;
+            hash_update($context, $stat === false ? 'absent' : $stat['mtime'] . ':' . $stat['size'] . ':' . $stat['ino']);
             hash_update($context, "\n");
         }
 
         return hash_final($context);
     }
 
+    /**
+     * The snapshot a cache file's metadata and variables describe, or null
+     * when a field is missing or mistyped, or a source changed since.
+     *
+     * @param array<array-key, mixed> $meta
+     */
+    private function snapshot(array $meta, mixed $variables): ?CacheSnapshot
+    {
+        $sources = $this->stringList($meta['sources'] ?? null);
+        $map = $this->stringMap($variables);
+
+        if ($sources === null || $map === null || !$this->isFresh($meta['source_hash'] ?? null, $sources)) {
+            return null;
+        }
+
+        return $this->describe($meta, $sources, $map);
+    }
+
+    /**
+     * @param array<array-key, mixed> $meta
+     * @param list<string> $sources
+     * @param array<string, string> $variables
+     */
+    private function describe(array $meta, array $sources, array $variables): ?CacheSnapshot
+    {
+        $strategy = $meta['strategy'] ?? null;
+        $encrypted = $meta['encrypted'] ?? null;
+        $environment = $meta['environment'] ?? null;
+        $requested = $meta['requested_environment'] ?? null;
+
+        if (!is_string($strategy) || !is_bool($encrypted)
+            || !$this->isNullableString($environment) || !$this->isNullableString($requested)
+        ) {
+            return null;
+        }
+
+        return new CacheSnapshot(
+            strategy: $strategy,
+            environment: $environment,
+            requestedEnvironment: $requested,
+            sources: $sources,
+            variables: $variables,
+            encrypted: $encrypted,
+        );
+    }
+
+    /** @param list<string> $sources */
+    private function isFresh(mixed $hash, array $sources): bool
+    {
+        return is_string($hash) && hash_equals($hash, $this->computeSourceHash($sources));
+    }
+
+    /** @psalm-assert-if-true string|null $value */
     private function isNullableString(mixed $value): bool
     {
         return $value === null || is_string($value);
@@ -183,12 +205,14 @@ final readonly class PhpFileCache
     }
 
     /**
-     * @param array<mixed> $value
-     *
      * @return array<string, string>|null
      */
-    private function stringMap(array $value): ?array
+    private function stringMap(mixed $value): ?array
     {
+        if (!is_array($value)) {
+            return null;
+        }
+
         $result = [];
 
         foreach ($value as $key => $item) {
